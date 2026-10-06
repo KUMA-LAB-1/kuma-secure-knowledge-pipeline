@@ -1,0 +1,44 @@
+[project]
+name = "kuma-secure-knowledge-pipeline"
+version = "0.1.0"
+description = "Evidence-first secure knowledge pipeline on AWS"
+readme = "README.md"
+authors = [
+    { name = "Wellington Hikaru Kumagai"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.43.108",
+]
+
+[project.scripts]
+kuma-secure-knowledge-pipeline = "kuma_secure_knowledge_pipeline:main"
+
+[build-system]
+requires = ["uv_build>=0.11.27,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "boto3-stubs[textract]>=1.43.108",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+]
