@@ -1,0 +1,110 @@
+name: Security CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Security Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Sync locked dependencies
+        run: uv sync --locked --group dev
+
+      - name: Unit and regression tests
+        run: uv run pytest -q
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Bandit SAST
+        run: uv run bandit -q -r src
+
+      - name: Dependency vulnerability audit
+        run: uv run pip-audit
+
+      - name: Secret scan
+        shell: bash
+        run: |
+          mapfile -t files < <(
+            git ls-files \
+              --cached \
+              --others \
+              --exclude-standard
+          )
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "Secret scan received an empty file set."
+            exit 1
+          fi
+
+          uv run detect-secrets scan "${files[@]}" \
+            > /tmp/detect-secrets.json
+
+          uv run python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(
+              Path("/tmp/detect-secrets.json").read_text(
+                  encoding="utf-8",
+              )
+          )
+
+          findings = result.get("results", {})
+
+          if findings:
+              print("Potential sensitive-data findings:")
+
+              for path, items in findings.items():
+                  print(f"- {path}")
+
+                  for item in items:
+                      detector = item.get("type")
+                      line = item.get("line_number")
+                      print(
+                          f"  type={detector} line={line}"
+                      )
+
+              raise SystemExit(1)
+
+          print("No potential sensitive data detected.")
+          PY
+
+      - name: Repository diff hygiene
+        run: git diff --check
+
+      - name: Smokey functional gate
+        run: uv run pytest -m smoke -q
