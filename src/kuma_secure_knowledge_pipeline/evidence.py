@@ -10,18 +10,30 @@ from kuma_secure_knowledge_pipeline.contracts import (
 )
 
 
-def _write_json(
-    destination: Path,
-    payload: Any,
-) -> None:
-    destination.write_text(
-        json.dumps(
+class EvidenceSerializationError(TypeError):
+    """Raised when evidence cannot be serialized without coercion."""
+
+
+def _serialize_json(payload: Any) -> str:
+    try:
+        return json.dumps(
             payload,
             indent=2,
             sort_keys=True,
             ensure_ascii=False,
-            default=str,
-        ),
+        )
+    except TypeError as exc:
+        raise EvidenceSerializationError(
+            "Evidence contains data that is not JSON serializable."
+        ) from exc
+
+
+def _write_text(
+    destination: Path,
+    content: str,
+) -> None:
+    destination.write_text(
+        content,
         encoding="utf-8",
     )
 
@@ -36,19 +48,6 @@ def write_extraction_evidence(
     if result.artifact_id != artifact.artifact_id:
         raise ValueError("Extraction result does not belong to the supplied artifact.")
 
-    evidence_dir = output_root / artifact.artifact_id
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-
-    _write_json(
-        evidence_dir / "raw-response.json",
-        dict(raw_response),
-    )
-
-    _write_json(
-        evidence_dir / "normalized.json",
-        asdict(result),
-    )
-
     manifest = {
         "source": asdict(artifact),
         "extraction": {
@@ -59,14 +58,33 @@ def write_extraction_evidence(
         },
     }
 
-    _write_json(
-        evidence_dir / "manifest.json",
-        manifest,
+    # Serialize everything before creating any evidence directory.
+    # A type error therefore fails closed without partial evidence.
+    raw_json = _serialize_json(dict(raw_response))
+    normalized_json = _serialize_json(asdict(result))
+    manifest_json = _serialize_json(manifest)
+
+    evidence_dir = output_root / artifact.artifact_id
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+
+    _write_text(
+        evidence_dir / "raw-response.json",
+        raw_json,
     )
 
-    (evidence_dir / "extracted.txt").write_text(
+    _write_text(
+        evidence_dir / "normalized.json",
+        normalized_json,
+    )
+
+    _write_text(
+        evidence_dir / "manifest.json",
+        manifest_json,
+    )
+
+    _write_text(
+        evidence_dir / "extracted.txt",
         result.text,
-        encoding="utf-8",
     )
 
     return evidence_dir
