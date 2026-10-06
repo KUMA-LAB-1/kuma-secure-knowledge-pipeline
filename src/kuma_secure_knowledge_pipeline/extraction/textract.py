@@ -7,19 +7,28 @@ from kuma_secure_knowledge_pipeline.contracts import (
 )
 
 
+class TextractResponseError(ValueError):
+    """Raised when a Textract response violates the expected contract."""
+
+
 def normalize_detect_document_text_response(
     *,
     artifact_id: str,
     response: Mapping[str, Any],
 ) -> ExtractionResult:
-    """Normalize an Amazon Textract DetectDocumentText response."""
+    """Normalize a validated Amazon Textract DetectDocumentText response."""
+
+    blocks = response.get("Blocks")
+
+    if not isinstance(blocks, list):
+        raise TextractResponseError("Textract response field 'Blocks' must be a list.")
 
     lines: list[str] = []
     evidence_refs: list[EvidenceReference] = []
 
-    for block in response.get("Blocks", []):
+    for block in blocks:
         if not isinstance(block, Mapping):
-            continue
+            raise TextractResponseError("Textract Block entries must be mappings.")
 
         if block.get("BlockType") != "LINE":
             continue
@@ -29,9 +38,26 @@ def normalize_detect_document_text_response(
         if not text:
             continue
 
-        confidence = float(block.get("Confidence", 0.0))
-        page = int(block.get("Page", 1))
-        block_id = str(block.get("Id", ""))
+        block_id = block.get("Id")
+
+        if not isinstance(block_id, str) or not block_id.strip():
+            raise TextractResponseError("Textract LINE block is missing a valid Id.")
+
+        try:
+            confidence = float(block.get("Confidence"))
+        except (TypeError, ValueError) as exc:
+            raise TextractResponseError("Textract LINE block has invalid Confidence.") from exc
+
+        if not 0.0 <= confidence <= 100.0:
+            raise TextractResponseError("Textract LINE block Confidence must be between 0 and 100.")
+
+        try:
+            page = int(block.get("Page", 1))
+        except (TypeError, ValueError) as exc:
+            raise TextractResponseError("Textract LINE block has invalid Page.") from exc
+
+        if page < 1:
+            raise TextractResponseError("Textract LINE block Page must be >= 1.")
 
         lines.append(text)
 
@@ -44,11 +70,11 @@ def normalize_detect_document_text_response(
             )
         )
 
-    average_confidence = (
-        sum(reference.confidence for reference in evidence_refs)
-        / len(evidence_refs)
-        if evidence_refs
-        else 0.0
+    if not evidence_refs:
+        raise TextractResponseError("Textract response contains no valid LINE blocks.")
+
+    average_confidence = sum(reference.confidence for reference in evidence_refs) / len(
+        evidence_refs
     )
 
     return ExtractionResult(

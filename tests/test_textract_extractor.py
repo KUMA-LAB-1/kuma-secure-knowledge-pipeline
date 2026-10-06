@@ -3,10 +3,7 @@ from typing import Any
 
 import pytest
 
-from kuma_secure_knowledge_pipeline.artifacts import (
-    ArtifactIntegrityError,
-    build_source_artifact,
-)
+from kuma_secure_knowledge_pipeline.artifacts import build_source_artifact
 from kuma_secure_knowledge_pipeline.extraction.client import TextractExtractor
 
 
@@ -37,6 +34,15 @@ class FakeTextractClient:
         }
 
 
+class FailingTextractClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def detect_document_text(self, **kwargs: Any) -> dict[str, Any]:
+        self.calls += 1
+        raise RuntimeError("provider-down")
+
+
 def test_textract_extractor_reads_file_and_calls_client(tmp_path: Path) -> None:
     source = tmp_path / "security-report.png"
     source.write_bytes(b"fake-png-content")
@@ -50,7 +56,6 @@ def test_textract_extractor_reads_file_and_calls_client(tmp_path: Path) -> None:
     )
 
     assert client.calls[0]["Document"]["Bytes"] == b"fake-png-content"
-
     assert raw_response["Blocks"][0]["Id"] == "line-001"
 
     assert result.artifact_id == artifact.artifact_id
@@ -70,10 +75,48 @@ def test_textract_extractor_rejects_tampered_file_before_client_call(
 
     client = FakeTextractClient()
 
-    with pytest.raises(ArtifactIntegrityError):
+    with pytest.raises(ValueError):
         TextractExtractor(client).extract(
             artifact=artifact,
             source_path=source,
         )
 
     assert client.calls == []
+
+
+def test_textract_extractor_rejects_unsupported_media_before_client_call(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "security-report.txt"
+    source.write_bytes(b"not-an-image")
+
+    artifact = build_source_artifact(source)
+    client = FakeTextractClient()
+
+    with pytest.raises(ValueError, match="Unsupported media type"):
+        TextractExtractor(client).extract(
+            artifact=artifact,
+            source_path=source,
+        )
+
+    assert client.calls == []
+
+
+def test_textract_extractor_wraps_provider_failure(tmp_path: Path) -> None:
+    source = tmp_path / "security-report.png"
+    source.write_bytes(b"fake-png-content")
+
+    artifact = build_source_artifact(source)
+    client = FailingTextractClient()
+
+    with pytest.raises(
+        RuntimeError,
+        match="Textract provider call failed",
+    ) as error:
+        TextractExtractor(client).extract(
+            artifact=artifact,
+            source_path=source,
+        )
+
+    assert client.calls == 1
+    assert isinstance(error.value.__cause__, RuntimeError)

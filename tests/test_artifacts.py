@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 
 from kuma_secure_knowledge_pipeline.artifacts import (
-    ArtifactIntegrityError,
     build_source_artifact,
     verify_artifact_integrity,
 )
@@ -33,5 +32,20 @@ def test_verify_artifact_integrity_rejects_modified_source(tmp_path: Path) -> No
 
     source.write_bytes(b"tampered")
 
-    with pytest.raises(ArtifactIntegrityError):
+    with pytest.raises(ValueError):
         verify_artifact_integrity(source, artifact)
+
+
+def test_build_source_artifact_rejects_empty_file(tmp_path: Path) -> None:
+    source = tmp_path / "empty.png"
+    source.write_bytes(b"")
+
+    with pytest.raises(ValueError, match="empty"):
+        build_source_artifact(source)
+
+
+def test_build_source_artifact_rejects_missing_file(tmp_path: Path) -> None:
+    source = tmp_path / "missing.png"
+
+    with pytest.raises(ValueError, match="does not exist"):
+        build_source_artifact(source)
