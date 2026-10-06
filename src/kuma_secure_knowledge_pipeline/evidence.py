@@ -34,9 +34,7 @@ def write_extraction_evidence(
     result: ExtractionResult,
 ) -> Path:
     if result.artifact_id != artifact.artifact_id:
-        raise ValueError(
-            "Extraction result does not belong to the supplied artifact."
-        )
+        raise ValueError("Extraction result does not belong to the supplied artifact.")
 
     evidence_dir = output_root / artifact.artifact_id
     evidence_dir.mkdir(parents=True, exist_ok=True)
