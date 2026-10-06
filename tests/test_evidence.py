@@ -20,26 +20,33 @@ def _reference(artifact_id: str) -> EvidenceReference:
     )
 
 
-def test_write_extraction_evidence_preserves_raw_and_normalized_data(
-    tmp_path: Path,
-) -> None:
-    artifact = SourceArtifact(
+def _artifact() -> SourceArtifact:
+    return SourceArtifact(
         artifact_id="art-001",
         filename="security-report.png",
         media_type="image/png",
         sha256="abc123",
     )
 
-    reference = _reference("art-001")
 
-    result = ExtractionResult(
-        artifact_id="art-001",
+def _result(
+    artifact_id: str = "art-001",
+) -> ExtractionResult:
+    return ExtractionResult(
+        artifact_id=artifact_id,
         provider="amazon-textract",
         operation="DetectDocumentText",
         text="INCIDENT ID: INC-001",
         average_confidence=99.5,
-        evidence_refs=(reference,),
+        evidence_refs=(_reference(artifact_id),),
     )
+
+
+def test_write_extraction_evidence_preserves_raw_and_normalized_data(
+    tmp_path: Path,
+) -> None:
+    artifact = _artifact()
+    result = _result()
 
     raw_response = {
         "Blocks": [
@@ -60,11 +67,23 @@ def test_write_extraction_evidence_preserves_raw_and_normalized_data(
         result=result,
     )
 
-    raw = json.loads((evidence_dir / "raw-response.json").read_text(encoding="utf-8"))
+    raw = json.loads(
+        (evidence_dir / "raw-response.json").read_text(
+            encoding="utf-8",
+        )
+    )
 
-    normalized = json.loads((evidence_dir / "normalized.json").read_text(encoding="utf-8"))
+    normalized = json.loads(
+        (evidence_dir / "normalized.json").read_text(
+            encoding="utf-8",
+        )
+    )
 
-    manifest = json.loads((evidence_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (evidence_dir / "manifest.json").read_text(
+            encoding="utf-8",
+        )
+    )
 
     extracted_text = (evidence_dir / "extracted.txt").read_text(encoding="utf-8")
 
@@ -80,21 +99,8 @@ def test_write_extraction_evidence_preserves_raw_and_normalized_data(
 def test_write_extraction_evidence_rejects_artifact_mismatch(
     tmp_path: Path,
 ) -> None:
-    artifact = SourceArtifact(
-        artifact_id="art-001",
-        filename="security-report.png",
-        media_type="image/png",
-        sha256="abc123",
-    )
-
-    result = ExtractionResult(
-        artifact_id="art-002",
-        provider="amazon-textract",
-        operation="DetectDocumentText",
-        text="INCIDENT",
-        average_confidence=99.5,
-        evidence_refs=(_reference("art-002"),),
-    )
+    artifact = _artifact()
+    result = _result("art-002")
 
     with pytest.raises(ValueError, match="does not belong"):
         write_extraction_evidence(
@@ -103,3 +109,27 @@ def test_write_extraction_evidence_rejects_artifact_mismatch(
             raw_response={"Blocks": []},
             result=result,
         )
+
+
+def test_write_extraction_evidence_fails_closed_on_non_json_data(
+    tmp_path: Path,
+) -> None:
+    artifact = _artifact()
+    result = _result()
+
+    raw_response = {
+        "Blocks": [],
+        "unexpected_object": object(),
+    }
+
+    evidence_dir = tmp_path / artifact.artifact_id
+
+    with pytest.raises(TypeError):
+        write_extraction_evidence(
+            output_root=tmp_path,
+            artifact=artifact,
+            raw_response=raw_response,
+            result=result,
+        )
+
+    assert not evidence_dir.exists()
