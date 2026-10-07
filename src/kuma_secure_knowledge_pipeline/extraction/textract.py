@@ -1,3 +1,4 @@
+import math
 from collections.abc import Mapping
 from typing import Any
 
@@ -33,28 +34,45 @@ def normalize_detect_document_text_response(
         if block.get("BlockType") != "LINE":
             continue
 
-        text = str(block.get("Text", "")).strip()
+        text_value = block.get("Text")
+
+        if not isinstance(text_value, str):
+            raise TextractResponseError("Textract LINE block Text must be a string.")
+
+        text = text_value.strip()
 
         if not text:
-            continue
+            raise TextractResponseError("Textract LINE block Text must not be empty.")
 
-        block_id = block.get("Id")
+        block_id_value = block.get("Id")
 
-        if not isinstance(block_id, str) or not block_id.strip():
+        if not isinstance(block_id_value, str) or not block_id_value.strip():
             raise TextractResponseError("Textract LINE block is missing a valid Id.")
 
-        try:
-            confidence = float(block.get("Confidence"))
-        except (TypeError, ValueError) as exc:
-            raise TextractResponseError("Textract LINE block has invalid Confidence.") from exc
+        # Block IDs are opaque provider identifiers.
+        # Preserve them exactly so EvidenceReference maps byte-for-byte
+        # to the identifier stored in the raw provider response.
+        block_id = block_id_value
 
-        if not 0.0 <= confidence <= 100.0:
+        confidence_value = block.get("Confidence")
+
+        if isinstance(confidence_value, bool) or not isinstance(
+            confidence_value,
+            (int, float),
+        ):
+            raise TextractResponseError("Textract LINE block has invalid Confidence.")
+
+        confidence = float(confidence_value)
+
+        if not math.isfinite(confidence) or not 0.0 <= confidence <= 100.0:
             raise TextractResponseError("Textract LINE block Confidence must be between 0 and 100.")
 
-        try:
-            page = int(block.get("Page", 1))
-        except (TypeError, ValueError) as exc:
-            raise TextractResponseError("Textract LINE block has invalid Page.") from exc
+        page_value = block.get("Page")
+
+        if isinstance(page_value, bool) or not isinstance(page_value, int):
+            raise TextractResponseError("Textract LINE block has invalid Page.")
+
+        page = page_value
 
         if page < 1:
             raise TextractResponseError("Textract LINE block Page must be >= 1.")
@@ -82,6 +100,9 @@ def normalize_detect_document_text_response(
         provider="amazon-textract",
         operation="DetectDocumentText",
         text="\n".join(lines),
-        average_confidence=round(average_confidence, 2),
+        average_confidence=round(
+            average_confidence,
+            2,
+        ),
         evidence_refs=tuple(evidence_refs),
     )
