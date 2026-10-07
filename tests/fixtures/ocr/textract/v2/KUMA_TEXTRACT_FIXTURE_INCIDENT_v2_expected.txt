@@ -1,0 +1,55 @@
+KUMA
+Secure Knowledge Pipeline
+OCR INCIDENT FIXTURE v2
+THREAT INTELLIGENCE
+INCIDENT ANALYSIS
+KNOWLEDGE EXTRACTION
+SECURE AUTOMATION
+
+SECURITY INCIDENT REPORT
+INCIDENT ID
+INC-2026-001
+
+1. SUMMARY
+Incident ID: INC-2026-001
+Detection Source: Firewall + SOC Review
+Severity: HIGH
+Report Date: 2026-10-07
+Status: UNDER INVESTIGATION
+Analyst: analyst-demo
+
+2. INDICATORS
+Source IP: 198.51.100.24
+Destination IP: 10.0.12.34
+Domain: vpn.corp.example.com
+Failed Logins: 17
+Account: analyst-demo
+MITRE ATT&CK: T1110 (Brute Force)
+
+3. OBSERVED LOG LINES
+2026-10-07T08:31:02Z  firewall  DENY  198.51.100.24 -> 10.0.12.34  ssh  user=analyst-demo
+2026-10-07T08:31:15Z  firewall  DENY  198.51.100.24 -> 10.0.12.34  ssh  user=analyst-demo
+2026-10-07T08:31:47Z  firewall  DENY  198.51.100.24 -> 10.0.12.34  ssh  user=analyst-demo
+2026-10-07T08:32:17Z  firewall  DENY  198.51.100.24 -> 10.0.12.34  ssh  user=analyst-demo
+
+4. EVIDENCE
+1. Original synthetic artifact preserved.
+2. SHA-256 integrity recorded before provider call.
+3. Raw provider response must be preserved.
+4. Normalized evidence references must remain traceable to raw blocks.
+
+5. ANALYST NOTES
+Multiple failed login attempts were observed from a documentation-only TEST-NET address.
+No successful authentication is represented in this synthetic scenario.
+This artifact exists only for OCR validation and public demonstration.
+
+6. RECOMMENDED NEXT STEPS
+1. Preserve original artifact and related evidence.
+2. Verify SHA-256 integrity.
+3. Extract OCR text.
+4. Preserve raw provider response.
+5. Normalize evidence references.
+6. Review confidence, provenance, and observed OCR differences.
+
+KUMA  |  SECURE KNOWLEDGE PIPELINE
+SYNTHETIC SECURITY FIXTURE  |  NO REAL CUSTOMER DATA
