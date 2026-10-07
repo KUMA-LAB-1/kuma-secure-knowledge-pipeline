@@ -5,13 +5,18 @@ import pytest
 
 from kuma_secure_knowledge_pipeline.contracts import (
     EvidenceReference,
+    ExtractionProvenance,
     ExtractionResult,
     SourceArtifact,
 )
-from kuma_secure_knowledge_pipeline.evidence import write_extraction_evidence
+from kuma_secure_knowledge_pipeline.evidence import (
+    write_extraction_evidence,
+)
 
 
-def _reference(artifact_id: str) -> EvidenceReference:
+def _reference(
+    artifact_id: str,
+) -> EvidenceReference:
     return EvidenceReference(
         artifact_id=artifact_id,
         block_id="line-001",
@@ -42,6 +47,16 @@ def _result(
     )
 
 
+def _provenance() -> ExtractionProvenance:
+    return ExtractionProvenance(
+        run_id="run-test-001",
+        provider="amazon-textract",
+        operation="DetectDocumentText",
+        region="us-east-1",
+        started_at_utc="2026-10-07T15:00:00Z",
+    )
+
+
 def test_write_extraction_evidence_preserves_raw_and_normalized_data(
     tmp_path: Path,
 ) -> None:
@@ -65,34 +80,33 @@ def test_write_extraction_evidence_preserves_raw_and_normalized_data(
         artifact=artifact,
         raw_response=raw_response,
         result=result,
+        provenance=_provenance(),
     )
 
-    raw = json.loads(
-        (evidence_dir / "raw-response.json").read_text(
-            encoding="utf-8",
-        )
-    )
+    raw = json.loads((evidence_dir / "raw-response.json").read_text(encoding="utf-8"))
 
-    normalized = json.loads(
-        (evidence_dir / "normalized.json").read_text(
-            encoding="utf-8",
-        )
-    )
+    normalized = json.loads((evidence_dir / "normalized.json").read_text(encoding="utf-8"))
 
-    manifest = json.loads(
-        (evidence_dir / "manifest.json").read_text(
-            encoding="utf-8",
-        )
-    )
+    manifest = json.loads((evidence_dir / "manifest.json").read_text(encoding="utf-8"))
 
     extracted_text = (evidence_dir / "extracted.txt").read_text(encoding="utf-8")
 
     assert raw["Blocks"][0]["Id"] == "line-001"
+
     assert normalized["artifact_id"] == "art-001"
+
     assert normalized["evidence_refs"][0]["block_id"] == "line-001"
+
     assert manifest["source"]["sha256"] == "abc123"
+
     assert manifest["extraction"]["provider"] == "amazon-textract"
+
     assert manifest["extraction"]["evidence_count"] == 1
+
+    assert manifest["status"] == "success"
+
+    assert manifest["run"]["run_id"] == "run-test-001"
+
     assert extracted_text == "INCIDENT ID: INC-001"
 
 
@@ -102,12 +116,16 @@ def test_write_extraction_evidence_rejects_artifact_mismatch(
     artifact = _artifact()
     result = _result("art-002")
 
-    with pytest.raises(ValueError, match="does not belong"):
+    with pytest.raises(
+        ValueError,
+        match="does not belong",
+    ):
         write_extraction_evidence(
             output_root=tmp_path,
             artifact=artifact,
             raw_response={"Blocks": []},
             result=result,
+            provenance=_provenance(),
         )
 
 
@@ -130,6 +148,7 @@ def test_write_extraction_evidence_fails_closed_on_non_json_data(
             artifact=artifact,
             raw_response=raw_response,
             result=result,
+            provenance=_provenance(),
         )
 
     assert not evidence_dir.exists()

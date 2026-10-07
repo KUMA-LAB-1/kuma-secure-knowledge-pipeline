@@ -13,7 +13,15 @@ class ArtifactIntegrityError(ValueError):
     """Raised when source bytes no longer match their registered SHA-256."""
 
 
-def sha256_file(source_path: Path) -> str:
+def sha256_bytes(
+    content: bytes,
+) -> str:
+    return hashlib.sha256(content).hexdigest()
+
+
+def sha256_file(
+    source_path: Path,
+) -> str:
     if not source_path.is_file():
         raise InvalidArtifactError("Source artifact does not exist or is not a file.")
 
@@ -26,7 +34,9 @@ def sha256_file(source_path: Path) -> str:
     return digest.hexdigest()
 
 
-def build_source_artifact(source_path: Path) -> SourceArtifact:
+def build_source_artifact(
+    source_path: Path,
+) -> SourceArtifact:
     if not source_path.is_file():
         raise InvalidArtifactError("Source artifact does not exist or is not a file.")
 
@@ -43,6 +53,16 @@ def build_source_artifact(source_path: Path) -> SourceArtifact:
         media_type=media_type,
         sha256=digest,
     )
+
+
+def verify_artifact_bytes(
+    content: bytes,
+    artifact: SourceArtifact,
+) -> None:
+    current_sha256 = sha256_bytes(content)
+
+    if current_sha256 != artifact.sha256:
+        raise ArtifactIntegrityError("Source artifact SHA-256 does not match registered evidence.")
 
 
 def verify_artifact_integrity(
