@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+import boto3
+
 from kuma_secure_knowledge_pipeline.artifacts import (
     InvalidArtifactError,
     verify_artifact_bytes,
@@ -16,6 +18,7 @@ from kuma_secure_knowledge_pipeline.extraction.textract import (
 
 TEXTRACT_PROVIDER = "amazon-textract"
 DETECT_DOCUMENT_TEXT_OPERATION = "DetectDocumentText"
+TEXTRACT_REGION = "us-east-1"
 
 SUPPORTED_MEDIA_TYPES = frozenset(
     {
@@ -43,6 +46,45 @@ class TextractClientProtocol(Protocol):
         self,
         **kwargs: Any,
     ) -> dict[str, Any]: ...
+
+
+def create_textract_client(
+    *,
+    profile_name: str,
+    region_name: str = TEXTRACT_REGION,
+) -> TextractClientProtocol:
+    """Create one explicitly region-bound boto3 Textract client."""
+
+    if not isinstance(profile_name, str) or not profile_name.strip():
+        raise ValueError("profile_name must be a non-empty string.")
+
+    if region_name != TEXTRACT_REGION:
+        raise ValueError(f"Textract runtime region mismatch: expected {TEXTRACT_REGION}.")
+
+    session = boto3.Session(
+        profile_name=profile_name,
+        region_name=region_name,
+    )
+
+    client = session.client(
+        "textract",
+        region_name=region_name,
+    )
+
+    client_region = getattr(
+        getattr(
+            client,
+            "meta",
+            None,
+        ),
+        "region_name",
+        None,
+    )
+
+    if client_region != region_name:
+        raise ValueError(f"Concrete Textract client region mismatch: expected {region_name}.")
+
+    return client
 
 
 def _verify_media_signature(
