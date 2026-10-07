@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "boto3>=1.43.108",
+    "boto3[crt]>=1.43.108",
 ]
 
 [project.scripts]

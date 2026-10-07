@@ -161,6 +161,41 @@ def _publish_bundle(
     return evidence_dir
 
 
+class EvidenceRunReservation:
+    """Fail-closed handle for one reserved evidence run."""
+
+    def __init__(
+        self,
+        *,
+        reservation_path: Path,
+        operation_root: Path,
+        artifact_root: Path,
+    ) -> None:
+        self._reservation_path = reservation_path
+        self._operation_root = operation_root
+        self._artifact_root = artifact_root
+        self._resolved = False
+
+    def resolve(self) -> None:
+        """Release a reservation only after durable evidence exists."""
+
+        if self._resolved:
+            return
+
+        with suppress(FileNotFoundError):
+            self._reservation_path.unlink()
+
+        _remove_empty_directory(
+            self._operation_root,
+        )
+
+        _remove_empty_directory(
+            self._artifact_root,
+        )
+
+        self._resolved = True
+
+
 @contextmanager
 def reserve_evidence_run(
     *,
@@ -168,8 +203,13 @@ def reserve_evidence_run(
     artifact_id: str,
     operation: str,
     run_id: str,
-) -> Iterator[None]:
-    """Atomically reserve one local evidence run before provider interaction."""
+) -> Iterator[EvidenceRunReservation]:
+    """Atomically reserve one local evidence run.
+
+    Reservations are fail-closed by default. The caller must explicitly
+    resolve the handle only after durable success or durable classified
+    failure evidence has been published.
+    """
 
     artifact_component = _validate_path_component(
         artifact_id,
@@ -200,7 +240,9 @@ def reserve_evidence_run(
     )
 
     try:
-        reservation_path.touch(exist_ok=False)
+        reservation_path.touch(
+            exist_ok=False,
+        )
     except FileExistsError as exc:
         raise EvidenceAlreadyExistsError(
             "Evidence run is already reserved: "
@@ -209,31 +251,42 @@ def reserve_evidence_run(
             f"{run_component}"
         ) from exc
     except Exception:
-        _remove_empty_directory(operation_root)
-        _remove_empty_directory(artifact_root)
+        _remove_empty_directory(
+            operation_root,
+        )
+
+        _remove_empty_directory(
+            artifact_root,
+        )
+
         raise
 
-    try:
-        # Re-check after acquiring the reservation.
-        # This closes the race where a completed bundle appears
-        # between an earlier existence check and lock acquisition.
-        if evidence_dir.exists():
-            raise EvidenceAlreadyExistsError(
-                "Evidence bundle already exists: "
-                f"{artifact_component}/"
-                f"{operation_component}/"
-                f"{run_component}"
-            )
-
-        yield
-
-    finally:
+    if evidence_dir.exists():
         with suppress(FileNotFoundError):
             reservation_path.unlink()
 
-        _remove_empty_directory(operation_root)
+        _remove_empty_directory(
+            operation_root,
+        )
 
-        _remove_empty_directory(artifact_root)
+        _remove_empty_directory(
+            artifact_root,
+        )
+
+        raise EvidenceAlreadyExistsError(
+            "Evidence bundle already exists: "
+            f"{artifact_component}/"
+            f"{operation_component}/"
+            f"{run_component}"
+        )
+
+    reservation = EvidenceRunReservation(
+        reservation_path=reservation_path,
+        operation_root=operation_root,
+        artifact_root=artifact_root,
+    )
+
+    yield reservation
 
 
 def write_extraction_evidence(
