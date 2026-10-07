@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import boto3
+from botocore.config import Config
 
 from kuma_secure_knowledge_pipeline.artifacts import (
     InvalidArtifactError,
@@ -66,9 +67,17 @@ def create_textract_client(
         region_name=region_name,
     )
 
+    retry_config = Config(
+        retries={
+            "total_max_attempts": 1,
+            "mode": "standard",
+        }
+    )
+
     client = session.client(
         "textract",
         region_name=region_name,
+        config=retry_config,
     )
 
     client_region = getattr(
