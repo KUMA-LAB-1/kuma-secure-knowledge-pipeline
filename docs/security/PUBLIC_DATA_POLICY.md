@@ -1,31 +1,32 @@
-# Public Data Policy
+# Política de Dados Públicos
 
-This public repository follows a synthetic-data-first policy.
+Este repositório público adota uma política que prioriza dados sintéticos.
 
-Real credentials, tokens, private keys, personal data, confidential
-documents, customer evidence, internal identifiers, and sensitive
-production logs must not be committed.
+Credenciais reais, tokens, chaves privadas, dados pessoais, documentos
+confidenciais, evidências de clientes, identificadores internos e logs
+sensíveis de produção não devem ser commitados.
 
-Demo and test material must be synthetic by construction or explicitly
-public.
+Materiais de demonstração e teste devem ser sintéticos por construção
+ou explicitamente públicos.
 
-Reserved documentation ranges and domains should be preferred for
-examples, including TEST-NET addresses and example domains.
+Faixas e domínios reservados para documentação devem ser priorizados
+nos exemplos, incluindo endereços TEST-NET e domínios de exemplo.
 
-If the publication status of any artifact is uncertain, treat it as
-sensitive and do not commit it.
+Se a condição de publicação de qualquer artefato for incerta, trate-o
+como sensível e não faça commit.
 
-Security review is defense in depth. A clean secret scan alone is not
-authorization to publish data.
+A revisão de segurança utiliza defesa em profundidade. Um scan de
+segredos limpo, isoladamente, não constitui autorização para publicar
+dados.
 
-Repository publication requires, where applicable:
+A publicação no repositório exige, quando aplicável:
 
-- synthetic/public data review;
-- automated secret scanning;
-- tests against accidental leakage;
-- staged diff inspection;
-- security/adversarial review;
-- clean global quality gates.
+- revisão dos dados sintéticos ou públicos;
+- scan automatizado de segredos;
+- testes contra vazamento acidental;
+- inspeção do diff staged;
+- revisão de segurança e Red Team;
+- quality gates globais limpos.
 
-Original evidence from real investigations must never be copied into
-this public repository.
+Evidências originais provenientes de investigações reais nunca devem
+ser copiadas para este repositório público.
