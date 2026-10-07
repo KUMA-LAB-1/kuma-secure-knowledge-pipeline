@@ -4,7 +4,7 @@ from typing import Any, Protocol
 
 from kuma_secure_knowledge_pipeline.artifacts import (
     InvalidArtifactError,
-    verify_artifact_integrity,
+    verify_artifact_bytes,
 )
 from kuma_secure_knowledge_pipeline.contracts import (
     ExtractionResult,
@@ -13,6 +13,9 @@ from kuma_secure_knowledge_pipeline.contracts import (
 from kuma_secure_knowledge_pipeline.extraction.textract import (
     normalize_detect_document_text_response,
 )
+
+TEXTRACT_PROVIDER = "amazon-textract"
+DETECT_DOCUMENT_TEXT_OPERATION = "DetectDocumentText"
 
 SUPPORTED_MEDIA_TYPES = frozenset(
     {
@@ -43,7 +46,7 @@ class TextractClientProtocol(Protocol):
 
 
 def _verify_media_signature(
-    source_path: Path,
+    document_bytes: bytes,
     media_type: str,
 ) -> None:
     signatures = _MEDIA_SIGNATURES.get(media_type)
@@ -51,8 +54,7 @@ def _verify_media_signature(
     if signatures is None:
         raise UnsupportedMediaTypeError(f"Unsupported media type for OCR: {media_type}")
 
-    with source_path.open("rb") as source:
-        header = source.read(16)
+    header = document_bytes[:16]
 
     if not any(header.startswith(signature) for signature in signatures):
         raise InvalidArtifactError(
@@ -66,31 +68,33 @@ class TextractExtractor:
 
     client: TextractClientProtocol
 
-    def extract(
+    def extract_raw(
         self,
         *,
         artifact: SourceArtifact,
         source_path: Path,
-    ) -> tuple[dict[str, Any], ExtractionResult]:
+    ) -> dict[str, Any]:
         if artifact.media_type not in SUPPORTED_MEDIA_TYPES:
             raise UnsupportedMediaTypeError(
                 f"Unsupported media type for OCR: {artifact.media_type}"
             )
 
-        verify_artifact_integrity(
-            source_path,
+        # Read exactly once. These are the same bytes that are
+        # integrity-checked, signature-checked, and sent to the provider.
+        document_bytes = source_path.read_bytes()
+
+        verify_artifact_bytes(
+            document_bytes,
             artifact,
         )
 
         _verify_media_signature(
-            source_path,
+            document_bytes,
             artifact.media_type,
         )
 
-        document_bytes = source_path.read_bytes()
-
         try:
-            response = self.client.detect_document_text(
+            return self.client.detect_document_text(
                 Document={
                     "Bytes": document_bytes,
                 }
@@ -98,9 +102,23 @@ class TextractExtractor:
         except Exception as exc:
             raise TextractProviderError("Textract provider call failed.") from exc
 
-        result = normalize_detect_document_text_response(
-            artifact_id=artifact.artifact_id,
-            response=response,
+    def extract(
+        self,
+        *,
+        artifact: SourceArtifact,
+        source_path: Path,
+    ) -> tuple[
+        dict[str, Any],
+        ExtractionResult,
+    ]:
+        raw_response = self.extract_raw(
+            artifact=artifact,
+            source_path=source_path,
         )
 
-        return response, result
+        result = normalize_detect_document_text_response(
+            artifact_id=artifact.artifact_id,
+            response=raw_response,
+        )
+
+        return raw_response, result

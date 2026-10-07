@@ -4,6 +4,9 @@ from typing import Any
 
 import pytest
 
+from kuma_secure_knowledge_pipeline.contracts import (
+    ExtractionProvenance,
+)
 from kuma_secure_knowledge_pipeline.runner import (
     run_local_pipeline,
 )
@@ -63,12 +66,22 @@ def test_local_pipeline_smokey_preserves_evidence_without_secret_leak(
     )
 
     output_root = tmp_path / "evidence"
+
     client = SyntheticTextractClient()
+
+    provenance = ExtractionProvenance(
+        run_id="run-smokey-001",
+        provider="amazon-textract",
+        operation="DetectDocumentText",
+        region="us-east-1",
+        started_at_utc="2026-10-07T15:00:00Z",
+    )
 
     evidence_dir = run_local_pipeline(
         source_path=source,
         output_root=output_root,
         client=client,
+        provenance=provenance,
     )
 
     assert len(client.calls) == 1
@@ -82,20 +95,22 @@ def test_local_pipeline_smokey_preserves_evidence_without_secret_leak(
 
     assert {path.name for path in evidence_dir.iterdir()} == expected_files
 
-    manifest = json.loads(
-        (evidence_dir / "manifest.json").read_text(
-            encoding="utf-8",
-        )
-    )
+    manifest = json.loads((evidence_dir / "manifest.json").read_text(encoding="utf-8"))
 
-    assert manifest["source"]["filename"] == ("synthetic-incident.png")
+    assert manifest["source"]["filename"] == "synthetic-incident.png"
 
     assert len(manifest["source"]["sha256"]) == 64
+
+    assert manifest["status"] == "success"
+
+    assert manifest["run"]["run_id"] == "run-smokey-001"
 
     extracted = (evidence_dir / "extracted.txt").read_text(encoding="utf-8")
 
     assert "INC-2026-001" in extracted
+
     assert "198.51.100.24" in extracted
+
     assert "analyst-demo" in extracted
 
     combined_output = "\n".join(
@@ -105,8 +120,6 @@ def test_local_pipeline_smokey_preserves_evidence_without_secret_leak(
         for path in evidence_dir.iterdir()
     )
 
-    # Environment-only data must never be copied into evidence.
     assert environment_canary not in combined_output
 
-    # Local filesystem path must not be embedded in public evidence.
     assert str(source) not in combined_output

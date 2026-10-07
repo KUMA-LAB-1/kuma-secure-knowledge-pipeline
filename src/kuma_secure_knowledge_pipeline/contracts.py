@@ -12,6 +12,17 @@ class SourceArtifact:
 
 
 @dataclass(frozen=True, slots=True)
+class ExtractionProvenance:
+    """Immutable identity and execution metadata for one provider run."""
+
+    run_id: str
+    provider: str
+    operation: str
+    region: str
+    started_at_utc: str
+
+
+@dataclass(frozen=True, slots=True)
 class EvidenceReference:
     """Reference from normalized content back to provider evidence."""
 
