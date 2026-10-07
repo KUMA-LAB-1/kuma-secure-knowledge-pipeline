@@ -54,20 +54,25 @@ def run_local_pipeline(
 ) -> Path:
     """Run one complete evidence-first local extraction path."""
 
-    _validate_textract_provenance(provenance)
+    _validate_textract_provenance(
+        provenance,
+    )
 
-    artifact = build_source_artifact(source_path)
+    artifact = build_source_artifact(
+        source_path,
+    )
 
-    # Reservation is acquired before any provider interaction.
-    # It protects one local/shared filesystem output root from
-    # duplicate sequential and concurrent execution of the same run.
+    # Reservation is acquired before provider interaction.
+    # It remains fail-closed unless durable evidence is published.
     with reserve_evidence_run(
         output_root=output_root,
         artifact_id=artifact.artifact_id,
         operation=provenance.operation,
         run_id=provenance.run_id,
-    ):
-        extractor = TextractExtractor(client)
+    ) as reservation:
+        extractor = TextractExtractor(
+            client,
+        )
 
         raw_response = extractor.extract_raw(
             artifact=artifact,
@@ -88,12 +93,18 @@ def run_local_pipeline(
                 error_type=type(exc).__name__,
             )
 
+            reservation.resolve()
+
             raise
 
-        return write_extraction_evidence(
+        evidence_dir = write_extraction_evidence(
             output_root=output_root,
             artifact=artifact,
             raw_response=raw_response,
             result=result,
             provenance=provenance,
         )
+
+        reservation.resolve()
+
+        return evidence_dir

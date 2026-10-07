@@ -185,6 +185,10 @@ def test_unexpected_normalizer_bug_is_not_persisted_as_provider_evidence(
 ) -> None:
     client = CountingTextractClient()
 
+    provenance = _provenance(
+        run_id="run-unexpected-bug-001",
+    )
+
     def raise_unexpected_bug(
         **kwargs: Any,
     ) -> None:
@@ -204,16 +208,41 @@ def test_unexpected_normalizer_bug_is_not_persisted_as_provider_evidence(
             source_path=_fixture(),
             output_root=tmp_path,
             client=client,
-            provenance=_provenance(
-                run_id="run-unexpected-bug-001",
-            ),
+            provenance=provenance,
         )
 
     assert client.calls == 1
 
-    # Bug interno não deve gerar bundle classificado
-    # falsamente como falha de normalização do provider.
-    assert not any(tmp_path.iterdir())
+    # O bug interno não pode gerar bundle classificado
+    # falsamente como evidência do provider.
+    assert not list(tmp_path.rglob("raw-response.json"))
+
+    assert not list(tmp_path.rglob("manifest.json"))
+
+    assert not list(tmp_path.rglob("normalized.json"))
+
+    assert not list(tmp_path.rglob("extracted.txt"))
+
+    # Porém o provider já foi chamado.
+    # A reservation deve permanecer fail-closed para
+    # impedir uma segunda chamada com o mesmo run_id.
+    reservations = list(tmp_path.rglob("*.reservation"))
+
+    assert len(reservations) == 1
+
+    with pytest.raises(
+        EvidenceAlreadyExistsError,
+    ):
+        run_local_pipeline(
+            source_path=_fixture(),
+            output_root=tmp_path,
+            client=client,
+            provenance=provenance,
+        )
+
+    assert client.calls == 1
+
+    assert len(list(tmp_path.rglob("*.reservation"))) == 1
 
 
 def test_region_mismatch_is_rejected_before_provider_call(

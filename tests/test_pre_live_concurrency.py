@@ -147,6 +147,8 @@ def test_same_run_id_is_atomically_reserved_before_provider_call(
 
     assert evidence_dir.is_dir()
 
+    assert not list(tmp_path.rglob("*.reservation"))
+
     assert {path.name for path in evidence_dir.iterdir()} == {
         "raw-response.json",
         "normalized.json",
@@ -211,10 +213,12 @@ class NonSerializableTextractClient:
         }
 
 
-def test_reservation_is_released_after_provider_failure(
+def test_reservation_is_retained_after_ambiguous_provider_failure(
     tmp_path: Path,
 ) -> None:
     client = FailingThenSuccessfulTextractClient()
+
+    provenance = _provenance()
 
     with pytest.raises(
         TextractProviderError,
@@ -224,33 +228,36 @@ def test_reservation_is_released_after_provider_failure(
             source_path=_fixture(),
             output_root=tmp_path,
             client=client,
-            provenance=_provenance(),
+            provenance=provenance,
         )
 
     assert client.calls == 1
 
-    assert not list(tmp_path.rglob("*.reservation"))
+    reservations = list(tmp_path.rglob("*.reservation"))
 
-    # Empty reservation directories must also be cleaned.
-    assert not any(tmp_path.iterdir())
+    assert len(reservations) == 1
 
-    evidence_dir = run_local_pipeline(
-        source_path=_fixture(),
-        output_root=tmp_path,
-        client=client,
-        provenance=_provenance(),
-    )
+    with pytest.raises(
+        EvidenceAlreadyExistsError,
+    ):
+        run_local_pipeline(
+            source_path=_fixture(),
+            output_root=tmp_path,
+            client=client,
+            provenance=provenance,
+        )
 
-    assert client.calls == 2
-    assert evidence_dir.is_dir()
+    assert client.calls == 1
 
-    assert not list(tmp_path.rglob("*.reservation"))
+    assert len(list(tmp_path.rglob("*.reservation"))) == 1
 
 
-def test_reservation_is_released_after_evidence_serialization_failure(
+def test_reservation_is_retained_after_post_provider_serialization_failure(
     tmp_path: Path,
 ) -> None:
     client = NonSerializableTextractClient()
+
+    provenance = _provenance()
 
     with pytest.raises(
         EvidenceSerializationError,
@@ -259,11 +266,25 @@ def test_reservation_is_released_after_evidence_serialization_failure(
             source_path=_fixture(),
             output_root=tmp_path,
             client=client,
-            provenance=_provenance(),
+            provenance=provenance,
         )
 
     assert client.calls == 1
 
-    assert not list(tmp_path.rglob("*.reservation"))
+    reservations = list(tmp_path.rglob("*.reservation"))
 
-    assert not any(tmp_path.iterdir())
+    assert len(reservations) == 1
+
+    with pytest.raises(
+        EvidenceAlreadyExistsError,
+    ):
+        run_local_pipeline(
+            source_path=_fixture(),
+            output_root=tmp_path,
+            client=client,
+            provenance=provenance,
+        )
+
+    assert client.calls == 1
+
+    assert len(list(tmp_path.rglob("*.reservation"))) == 1
