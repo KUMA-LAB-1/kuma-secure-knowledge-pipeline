@@ -14,6 +14,7 @@ from kuma_secure_knowledge_pipeline.evidence import (
 from kuma_secure_knowledge_pipeline.extraction.client import (
     DETECT_DOCUMENT_TEXT_OPERATION,
     TEXTRACT_PROVIDER,
+    TEXTRACT_REGION,
     TextractClientProtocol,
     TextractExtractor,
 )
@@ -25,7 +26,7 @@ from kuma_secure_knowledge_pipeline.provenance import (
     validate_extraction_provenance,
 )
 
-EXPECTED_TEXTRACT_REGION = "us-east-1"
+EXPECTED_TEXTRACT_REGION = TEXTRACT_REGION
 
 
 def _validate_textract_provenance(
@@ -45,6 +46,34 @@ def _validate_textract_provenance(
         )
 
 
+def _validate_concrete_textract_client_region(
+    *,
+    client: TextractClientProtocol,
+    provenance: ExtractionProvenance,
+) -> None:
+    """Validate region metadata when the concrete SDK client exposes it."""
+
+    client_meta = getattr(
+        client,
+        "meta",
+        None,
+    )
+
+    # Protocol-only synthetic clients used by unit tests do not
+    # need SDK metadata. Real boto3 clients expose client.meta.
+    if client_meta is None:
+        return
+
+    client_region = getattr(
+        client_meta,
+        "region_name",
+        None,
+    )
+
+    if client_region != provenance.region:
+        raise ValueError(f"Textract client region mismatch: expected {provenance.region}.")
+
+
 def run_local_pipeline(
     *,
     source_path: Path,
@@ -56,6 +85,11 @@ def run_local_pipeline(
 
     _validate_textract_provenance(
         provenance,
+    )
+
+    _validate_concrete_textract_client_region(
+        client=client,
+        provenance=provenance,
     )
 
     artifact = build_source_artifact(
