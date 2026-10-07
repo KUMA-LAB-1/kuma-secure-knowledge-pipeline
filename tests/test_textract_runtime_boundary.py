@@ -111,6 +111,7 @@ def test_boto3_factory_pins_profile_and_region(
             service_name: str,
             *,
             region_name: str | None = None,
+            config: Any | None = None,
         ) -> Any:
             captured["service_name"] = service_name
             captured["client_region"] = region_name
