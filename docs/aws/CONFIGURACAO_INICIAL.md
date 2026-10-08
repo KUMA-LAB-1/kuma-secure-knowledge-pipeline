@@ -45,7 +45,7 @@ PROJETO_DEVELOPERS
       └── sessão temporária via aws login
 ```
 
-Este modelo foi mantido propositalmente pequeno para uma conta standalone de laboratório/bootcamp. Ambientes maiores ou com múltiplas contas devem avaliar IAM Identity Center e IAM Roles.
+Este modelo foi mantido propositalmente pequeno para uma conta standalone de laboratório independente. Ambientes maiores ou com múltiplas contas devem avaliar IAM Identity Center e IAM Roles.
 
 ## 1. Proteger o usuário root
 
@@ -416,7 +416,7 @@ Nenhum Account ID real ou credencial deve ser armazenado no repositório.
 
 ## Melhorias futuras
 
-Após o MVP/bootcamp, avaliar:
+Após o MVP, avaliar:
 
 - IAM Roles;
 - IAM Identity Center quando fizer sentido;
