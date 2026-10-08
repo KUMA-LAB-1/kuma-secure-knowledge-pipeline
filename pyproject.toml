@@ -8,11 +8,8 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "boto3>=1.43.108",
+    "boto3[crt]>=1.43.108",
 ]
-
-[project.scripts]
-kuma-secure-knowledge-pipeline = "kuma_secure_knowledge_pipeline:main"
 
 [build-system]
 requires = ["uv_build>=0.11.27,<0.12.0"]
@@ -20,7 +17,10 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "bandit>=1.9.4",
     "boto3-stubs[textract]>=1.43.108",
+    "detect-secrets>=1.5.0",
+    "pip-audit>=2.10.1",
     "pytest>=9.1.1",
     "ruff>=0.16.10",
 ]
@@ -28,6 +28,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "smoke: functional smoke tests for critical paths",
+]
 
 [tool.ruff]
 target-version = "py312"

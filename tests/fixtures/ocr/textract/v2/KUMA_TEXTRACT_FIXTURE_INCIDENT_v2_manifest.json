@@ -1,0 +1,25 @@
+{
+  "asset": "KUMA_TEXTRACT_FIXTURE_INCIDENT_v2.png",
+  "version": "v2",
+  "purpose": "Deterministic synthetic OCR fixture for Amazon Textract Challenge 01",
+  "synthetic": true,
+  "contains_real_customer_data": false,
+  "contains_secrets": false,
+  "source_ip": "198.51.100.24",
+  "source_ip_classification": "TEST-NET-2 documentation address",
+  "domain": "vpn.corp.example.com",
+  "dimensions": {
+    "width": 1500,
+    "height": 2000
+  },
+  "format": "PNG",
+  "visual_identity_asset": "KUMA_IDENTIDADE_v2.png",
+  "expected_text_file": "KUMA_TEXTRACT_FIXTURE_INCIDENT_v2_expected.txt",
+  "status": "candidate_official",
+  "generated_at_utc": "2026-10-07T11:53:58+00:00",
+  "immutability_note": "Do not modify silently after first provider execution; create a new version instead.",
+  "integrity": {
+    "algorithm": "SHA-256",
+    "digest_file": "KUMA_TEXTRACT_FIXTURE_INCIDENT_v2.sha256.txt"
+  }
+}
