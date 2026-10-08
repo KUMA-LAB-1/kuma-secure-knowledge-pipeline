@@ -1,5 +1,7 @@
 # KUMA Secure Knowledge Pipeline
 
+![Banner KUMA Secure Knowledge Pipeline](docs/assets/branding/KUMA_HEADER_README_v3.png)
+
 [![Security CI](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/workflows/security-ci.yml/badge.svg)](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/workflows/security-ci.yml)
 
 **Pipeline de extração documental orientado por evidências, com integridade verificável, normalização e rastreabilidade.**

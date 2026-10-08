@@ -124,8 +124,7 @@ Exemplo:
       "Sid": "Challenge01TextractOnly",
       "Effect": "Allow",
       "Action": [
-        "textract:DetectDocumentText",
-        "textract:AnalyzeDocument"
+        "textract:DetectDocumentText"
       ],
       "Resource": "*",
       "Condition": {
@@ -140,9 +139,17 @@ Exemplo:
 
 Anexe essa política IAM ao grupo de desenvolvimento.
 
+Nota de escopo: este exemplo apresenta a permissão mínima
+necessária ao adapter implementado neste marco.
+O laboratório histórico também concedeu
+`textract:AnalyzeDocument`, mas essa operação não está
+implementada no adapter atual nem foi validada em execução
+AWS bem-sucedida. Esta documentação não comprova o estado
+atual da policy efetivamente anexada na conta.
+
 ### Por que `Resource: "*"`?
 
-Para essas operações do Textract não existe um tipo de recurso aplicável que permita restringir a autorização a um ARN específico.
+Para a operação `DetectDocumentText` do Textract não existe um tipo de recurso aplicável que permita restringir a autorização a um ARN específico.
 
 Por isso, a restrição é feita pelas ações autorizadas e pela região.
 

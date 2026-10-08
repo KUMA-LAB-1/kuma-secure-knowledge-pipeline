@@ -19,14 +19,12 @@ A revisão de segurança utiliza defesa em profundidade. Um scan de
 segredos limpo, isoladamente, não constitui autorização para publicar
 dados.
 
-A publicação no repositório exige, quando aplicável:
-
-- revisão dos dados sintéticos ou públicos;
-- scan automatizado de segredos;
-- testes contra vazamento acidental;
-- inspeção do diff staged;
-- revisão de segurança e Red Team;
-- quality gates globais limpos.
+A publicação exige confirmar que os materiais são sintéticos
+ou explicitamente públicos, que não contêm segredos ou dados
+sensíveis e que os controles técnicos aplicáveis foram
+satisfeitos. As verificações automatizadas de segurança
+e qualidade permanecem obrigatórias conforme a configuração
+do projeto.
 
 Evidências originais provenientes de investigações reais nunca devem
 ser copiadas para este repositório público.

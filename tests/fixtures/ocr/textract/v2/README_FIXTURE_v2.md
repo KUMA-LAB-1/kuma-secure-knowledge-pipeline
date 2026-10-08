@@ -19,18 +19,10 @@ Fornecer um artefato PNG válido, público e reproduzível para testes de OCR co
 - Usa `vpn.corp.example.com` como domínio de exemplo.
 - Não alterar silenciosamente após a primeira execução real. Mudanças exigem nova versão.
 
-## Estratégia de validação
-Comparar OCR observado contra o baseline esperado, registrando:
-- cobertura de campos;
-- valores críticos;
-- ordem geral;
-- pontuação relevante;
-- confidence;
-- diferenças de whitespace;
-- referências de evidência;
-- raw response preservado.
+## Referências verificáveis
+O texto esperado, o manifesto e o SHA-256 permitem conferir
+a referência pública e a integridade da imagem sintética.
 
-## Uso planejado
-1. DetectDocumentText como baseline.
-2. AnalyzeDocument somente após adapter, custo e gate explícitos.
-3. Comparação A/B usando a mesma fixture.
+## Uso
+Esta fixture destina-se a demonstrações e testes de OCR
+sem dados reais de clientes ou incidentes.

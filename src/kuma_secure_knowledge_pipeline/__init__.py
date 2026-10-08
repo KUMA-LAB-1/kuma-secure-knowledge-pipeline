@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from kuma-secure-knowledge-pipeline!")
+"""KUMA Secure Knowledge Pipeline package."""
