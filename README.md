@@ -4,9 +4,11 @@
 
 [![Security CI](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/workflows/security-ci.yml/badge.svg)](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/workflows/security-ci.yml)
 
-**Pipeline de extração documental orientado por evidências, com integridade verificável, normalização e rastreabilidade.**
+**Pipeline de segurança orientado por evidências: OCR verificável, orquestração e enriquecimento com IA generativa.**
 
-O KUMA Secure Knowledge Pipeline é um projeto independente de engenharia de software e segurança para extração, normalização e rastreabilidade de informações documentais. A evolução é incremental: o **Challenge 01 (OCR e evidências)** estabelece a fundação técnica; os próximos Challenges ampliarão a orquestração e a recuperação de conhecimento.
+O KUMA Secure Knowledge Pipeline é um projeto independente de engenharia de software e segurança. O **Challenge 01** estabeleceu a extração OCR, a integridade e a rastreabilidade documental; o **Challenge 02** acrescentou contratos GenAI e orquestração funcional **offline**, em revisão no [PR #3](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3); o **Challenge 03** está planejado para recuperação de conhecimento e citações.
+
+> **Estado técnico em 10/10/2026 (C02-POST-064):** Challenge 01 integrado e versionado em [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Challenge 02 implementado **offline**, com **296 testes aprovados no Security CI** (incluindo **2 smokes**, não adicionais), no commit SSH [`535cb257`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/535cb257f46e114607ec27357467ee7f60931092). [CI push SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086828686) e [CI pull_request SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086831265). O [PR #3](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3) está **Ready for review**, ainda sem merge. Não houve execução real de AWS Step Functions, Bedrock, Lambda ou S3 nesta etapa.
 
 > **Transparência:** o fluxo OCR local com **Tesseract** foi executado e auditado. O adapter **Amazon Textract** foi desenvolvido e testado com respostas sintéticas, porém a primeira tentativa real de `DetectDocumentText` foi bloqueada com `SubscriptionRequiredException`. **Não existe resultado OCR AWS bem-sucedido neste Challenge 01.** Os motores não são apresentados como equivalentes, nem suas evidências são misturadas.
 
@@ -168,7 +170,7 @@ ruff check (arquivos do adapter):    passed
 ruff format --check:                passed
 ```
 
-O pipeline de CI também inclui pytest, Ruff, Bandit, pip-audit, detect-secrets, higiene de diff e smoke test. **Os 80 testes acima são um resultado local**; o CI remoto deve ser executado e confirmado sobre o commit final da entrega, antes de marcar a versão como concluída.
+O pipeline de CI também inclui pytest, Ruff, Bandit, pip-audit, detect-secrets, higiene de diff e smoke test. **Os 80 testes acima registram um checkpoint histórico do Challenge 01, não o total de testes do projeto atual.** O marco OCR foi posteriormente integrado e preservado na tag [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence); a validação mais recente da branch Challenge 02 está documentada na seção 10.
 
 Verificações importantes: dados sintéticos, validação de integridade da fonte, checagem de tipo e assinatura, rejeição de resposta malformada, referências rastreáveis, execução sem shell no Tesseract, timeout, rejeição de overwrite e comportamento fail-closed para reservas de execução. Todos os limites e resultados devem ser interpretados dentro do ambiente testado, não como garantia geral de isolamento contra entradas hostis.
 
@@ -206,17 +208,88 @@ scripts/quality-gate.ps1
 3. **Falha controlada também é evidência.** A tentativa AWS bloqueada foi registrada sem retries automáticos, sem alteração oportunista de permissões ou de plano de cobrança.
 4. **Teste sintético e demonstração real respondem perguntas diferentes.** Os testes protegem contratos e casos de falha; o OCR real comprova o caminho executável no ambiente local.
 
-## 9. Evolução do projeto
+## 9. Challenge 02: orquestração de evidências e GenAI (offline)
 
-| Marco | Escopo |
+A evolução mantém o núcleo de segurança e o vínculo com a evidência original. Não se trata de um assistente de delivery: é uma implementação autoral orientada à análise de evidências SOC.
+
+```text
+Bundle OCR existente (raw / normalized / texto / manifest)
+       |
+       v
+LoadEvidence -> AnalysisInput verificado
+       |
+       v
+BuildRequest -> GenAIRequest com referências autorizadas
+       |
+       v
+Enrich -> GenAIProvider -> StructuredEnrichment
+       |                         (fatos + refs, hipóteses,
+       |                          lacunas, verificações)
+       v
+PersistResult -> LocalStageStore -> result:<sha256>
+       |
+       v
+Resultado local auditável e commit idempotente
+```
+
+**Implementado e exercitado localmente:**
+
+- `genai_request.py`, `genai_response.py`, `genai_json.py` e `genai_provider.py`: contratos e validação de entrada/saída, limites e referências vinculadas às evidências.
+- `genai_ollama.py`: adapter para **Ollama** em loopback, com demonstração separada de inferência real utilizando Qwen local. O `FakeGenAIProvider` sustenta testes reproduzíveis sem inferência pesada.
+- `stepfunctions_handlers.py` e `stepfunctions_store.py`: handlers offline de `LoadEvidence`, `BuildRequest`, `Enrich`, `PersistResult` e `AuditFailure`, referências de conteúdo, escopo por execução e persistência local idempotente.
+- [`kuma_pipeline.asl.json`](infra/stepfunctions/kuma_pipeline.asl.json): definição **de referência** em Amazon States Language para um futuro workflow Step Functions. Seus estados e contratos foram testados estruturalmente, mas a definição **não foi implantada nem validada pelo serviço AWS**.
+
+A demonstração com provider falso validou a sequência de etapas, reabertura do armazenamento, idempotência e referência de evidência. Isso não equivale a durabilidade distribuída nem a execução AWS. Consulte a [arquitetura ASL](infra/stepfunctions/README.md) e o [guia dos handlers locais](infra/stepfunctions/HANDLERS_LOCAL.md).
+
+**Fronteiras de confiança:** as respostas GenAI passam por validação estruturada, mas uma referência válida não garante que o conteúdo da afirmação esteja semanticamente correto. Em particular, metadados históricos `amazon-textract` em fixtures sintéticas **não comprovam chamada real ao Textract**. O contrato de saída não permite confirmar incidentes automaticamente. Na ASL, `Catch.ResultPath: null` reduz a propagação do erro no estado encaminhado, **sem eliminar** possíveis detalhes do erro no histórico da futura execução AWS. Sanitização nas Lambdas e controles de acesso permanecem pendentes para cloud.
+
+## 10. Verificação e alcance dos testes
+
+Esta seção preserva checkpoints históricos e destaca a validação mais recente, vinculada ao SHA exato de cada execução. Os resultados intermediários continuam registrados, mas não substituem o gate final do commit `535cb257`.
+
+| Marco ou verificação | Resultado e abrangência |
 |---|---|
-| **Challenge 01** | Extração OCR, integridade, contratos, normalização e evidências |
-| **Challenge 02 (futuro)** | Orquestração com Step Functions e enriquecimento com Bedrock |
-| **Challenge 03 (futuro)** | Knowledge pipeline/wiki, ingestão multi-formato, recuperação e citações |
-| **Evolução futura** | Integração com fluxos SOC, SIEM, EDR e XDR |
+| Checkpoint histórico [`57fdd91`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/57fdd91916e9ec3b89ee6ad9feecf02bcd4a38e2) | **244 testes globais locais aprovados** e [Security CI SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38041583472) naquele marco |
+| Commit-base [`f57b951`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/f57b95112176149504f5cc145bc36dc09becefe9) | [Security CI SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38069047649), anterior às correções posteriores já publicadas no commit `535cb257` |
+| Checkpoint local pré-publicação em **10/10/2026** | **278 testes globais aprovados** e **2 smokes aprovados** |
+| Quality gate local em 10/10/2026 | Ruff lint e format, Bandit, auditoria de dependências auditáveis e `git diff --check` aprovados; `detect-secrets` sem achados em **87 arquivos** |
+| **C02-POST-064, commit de validação [`535cb257`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/535cb257f46e114607ec27357467ee7f60931092)** | **296 testes aprovados** no CI remoto; 2 smokes incluídos nos 296; 7 commits desse checkpoint assinados e verificados pelo GitHub |
+| **CI remoto do commit `535cb257`** | [CI push SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086828686) e [CI pull_request SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086831265); pytest, Ruff, Bandit, auditoria das dependências auditáveis, detecção de segredos, diff e smoke aprovados |
+| Contratos ASL | **7 testes estruturais aprovados** no checkpoint histórico, sem validação pelo serviço AWS |
+| Assinatura do marco histórico de segurança | SSH **Verified** pelo GitHub |
 
-O Challenge 02 só começará após o fechamento técnico e documental, a revisão de publicação, o PR/merge e a versão do Challenge 01. A tag proposta para o primeiro marco é `v0.1.0-ocr-evidence` e **não representa, por si só, execução live Textract bem-sucedida**.
+**Os níveis de demonstração não devem ser confundidos:**
+
+1. **Smoke OCR:** o teste `tests/smoke/test_local_pipeline_smokey.py` cobre um pipeline OCR local com cliente Textract *sintético*, a publicação dos artefatos e canários de não vazamento de dados do ambiente/caminho local. Esse smoke passou no CI.
+2. **GenAI e handlers locais:** o smoke `tests/smoke/test_genai_stage_smokey.py` cobre offline o percurso OCR sintético, `LoadEvidence`, `BuildRequest`, `Enrich` e `PersistResult`, incluindo reabertura do resultado persistido, idempotência e verificação de canários. Usa cliente OCR e provider GenAI sintéticos, **sem executar AWS ou Ollama nesse teste**. A inferência Qwen real foi exercitada separadamente.
+3. **Smoke cloud:** **não implementado e não executado** para Step Functions, Lambda, Bedrock ou S3. Os testes locais não podem ser usados como prova de uso desses serviços.
+
+O `pip-audit` não identificou vulnerabilidades conhecidas nas dependências auditáveis, mas não conseguiu auditar o pacote local do próprio projeto por ele não estar publicado no PyPI. Nenhum teste garante por si só isolamento perfeito contra entradas hostis ou ausência de incorreções semânticas do modelo.
+
+## 11. Acessibilidade e custo financeiro zero
+
+O projeto adota **R$ 0,00 de desembolso pessoal** como restrição de engenharia. Priorizamos ferramentas gratuitas e open source, execução local, contratos independentes de provedor e testes reproduzíveis. Recursos ou créditos AWS somente seriam utilizados mediante verificação de elegibilidade, gratuidade e ausência de risco de cobrança. Nenhum plano pago ou operação cloud faz parte desta demonstração.
+
+| Conceito apresentado no curso | Implementação demonstrada | Limite declarado |
+|---|---|---|
+| OCR documental / Amazon Textract | Tesseract OCR executado localmente; adapter Textract testado com resposta sintética | Textract real não produziu OCR bem-sucedido |
+| IA generativa / Amazon Bedrock | Ollama/Qwen real em inferência local; contratos GenAI independentes de provedor | Bedrock não executado |
+| Orquestração / AWS Step Functions | ASL de referência, handlers e persistência locais | Nenhuma state machine implantada ou executada na AWS |
+| Execução de tarefas / AWS Lambda | Funções Python e handlers locais | Sem execução Lambda real |
+| Persistência / Amazon S3 | LocalStageStore com SHA-256 e commit idempotente | Sem armazenamento S3 nem garantias cloud |
+
+**Equivalência de conceito não significa equivalência de serviço.** A escolha de ferramentas abertas demonstra decisões arquiteturais sob restrições de custo, mas não comprova automaticamente atendimento aos requisitos literais de um exercício que solicite serviços AWS e um assistente de delivery.
+
+## 12. Marcos do projeto
+
+| Marco | Situação verificável |
+|---|---|
+| **Challenge 01: OCR e evidências** | **Concluído e integrado**, [PR #2](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/2) e tag assinada [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Tesseract local real; Textract real bloqueado. |
+| **Challenge 02: orquestração e GenAI** | **Implementação offline concluída para revisão**, [PR #3 Ready for review](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3); ainda sem merge, Bedrock ou Step Functions AWS reais. |
+| **Challenge 03: wiki/knowledge pipeline** | Planejado: ingestão multi-formato, recuperação, RAG, provenance e citações. |
+
+O **GitHub Release completo** ficará para depois da conclusão dos três desafios. Os documentos e experimentos privados não integram automaticamente o escopo público do repositório.
 
 ---
 
-**Projeto independente de engenharia e portfólio técnico, com dados sintéticos e compromisso de rastreabilidade.** A adaptação local permite demonstrar a arquitetura sem extrapolar o orçamento autorizado para serviços de nuvem.
+**Projeto independente de engenharia e portfólio técnico, com dados sintéticos, rastreabilidade e foco em acesso gratuito ao aprendizado.**
