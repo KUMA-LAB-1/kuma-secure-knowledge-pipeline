@@ -1,0 +1,150 @@
+{
+  "Comment": "KUMA Secure Knowledge Pipeline: reference-only orchestration. Handler ARNs are injected during deployment; no deployment is included.",
+  "StartAt": "LoadEvidence",
+  "TimeoutSeconds": 300,
+  "States": {
+    "LoadEvidence": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${LoadEvidenceLambdaArn}",
+        "Payload": {
+          "bundle_ref.$": "$.bundle_ref",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "ResultSelector": {
+        "context_ref.$": "$.Payload.context_ref",
+        "artifact_id.$": "$.Payload.artifact_id",
+        "extraction_run_id.$": "$.Payload.extraction_run_id"
+      },
+      "ResultPath": "$.context",
+      "TimeoutSeconds": 30,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.failure",
+          "Next": "AuditFailure"
+        }
+      ],
+      "Next": "BuildRequest"
+    },
+    "BuildRequest": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${BuildRequestLambdaArn}",
+        "Payload": {
+          "context_ref.$": "$.context.context_ref",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "ResultSelector": {
+        "request_ref.$": "$.Payload.request_ref"
+      },
+      "ResultPath": "$.request",
+      "TimeoutSeconds": 30,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.failure",
+          "Next": "AuditFailure"
+        }
+      ],
+      "Next": "Enrich"
+    },
+    "Enrich": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${EnrichLambdaArn}",
+        "Payload": {
+          "request_ref.$": "$.request.request_ref",
+          "model_profile.$": "$.model_profile",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "ResultSelector": {
+        "enrichment_ref.$": "$.Payload.enrichment_ref"
+      },
+      "ResultPath": "$.enrichment",
+      "TimeoutSeconds": 180,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.failure",
+          "Next": "AuditFailure"
+        }
+      ],
+      "Next": "PersistResult"
+    },
+    "PersistResult": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PersistResultLambdaArn}",
+        "Payload": {
+          "artifact_id.$": "$.context.artifact_id",
+          "extraction_run_id.$": "$.context.extraction_run_id",
+          "enrichment_ref.$": "$.enrichment.enrichment_ref",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "ResultSelector": {
+        "result_ref.$": "$.Payload.result_ref",
+        "sha256.$": "$.Payload.sha256"
+      },
+      "ResultPath": "$.persisted",
+      "TimeoutSeconds": 30,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.failure",
+          "Next": "AuditFailure"
+        }
+      ],
+      "Next": "Succeeded"
+    },
+    "AuditFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${AuditFailureLambdaArn}",
+        "Payload": {
+          "execution_id.$": "$$.Execution.Id",
+          "error_code.$": "$.failure.Error"
+        }
+      },
+      "ResultPath": null,
+      "TimeoutSeconds": 15,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "Failed"
+        }
+      ],
+      "Next": "Failed"
+    },
+    "Succeeded": {
+      "Type": "Succeed"
+    },
+    "Failed": {
+      "Type": "Fail",
+      "Error": "KumaWorkflowFailed",
+      "Cause": "Workflow failed; inspect restricted execution and audit records."
+    }
+  }
+}
