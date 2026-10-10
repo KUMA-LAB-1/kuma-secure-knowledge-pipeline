@@ -38,12 +38,19 @@ def validate_error_code(value: object) -> str:
 
 
 def _canonical(value: object) -> bytes:
+    invalid_encoding = False
+
     try:
-        return json.dumps(
+        encoded = json.dumps(
             value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
         ).encode("utf-8")
-    except (TypeError, ValueError, UnicodeError) as exc:
-        raise StageStoreError("Invalid record encoding.") from exc
+    except (TypeError, ValueError, UnicodeError):
+        invalid_encoding = True
+
+    if invalid_encoding:
+        raise StageStoreError("Invalid record encoding.")
+
+    return encoded
 
 
 def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -158,10 +165,15 @@ class LocalStageStore:
         raw = _read_bytes(self.root / kind / f"{digest}.json")
         if hashlib.sha256(raw).hexdigest() != digest:
             raise StageStoreError("Stage content digest mismatch.")
+        invalid_json = False
+
         try:
             document = json.loads(raw, object_pairs_hook=_no_duplicate_keys)
-        except (UnicodeError, json.JSONDecodeError, RecursionError, ValueError) as exc:
-            raise StageStoreError("Invalid stored stage JSON.") from exc
+        except (UnicodeError, json.JSONDecodeError, RecursionError, ValueError):
+            invalid_json = True
+
+        if invalid_json:
+            raise StageStoreError("Invalid stored stage JSON.")
         if (
             type(document) is not dict
             or set(document) != {"kind", "execution_id", "data"}

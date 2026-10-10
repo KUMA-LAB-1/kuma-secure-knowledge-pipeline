@@ -48,13 +48,18 @@ def validate_extraction_provenance(
     if not _UTC_TIMESTAMP_PATTERN.fullmatch(timestamp):
         raise ValueError("started_at_utc must use canonical YYYY-MM-DDTHH:MM:SSZ format.")
 
+    invalid_timestamp = False
+
     try:
         datetime.strptime(
             timestamp,
             "%Y-%m-%dT%H:%M:%SZ",
         )
-    except ValueError as exc:
-        raise ValueError("started_at_utc must be a valid canonical UTC timestamp.") from exc
+    except ValueError:
+        invalid_timestamp = True
+
+    if invalid_timestamp:
+        raise ValueError("started_at_utc must be a valid canonical UTC timestamp.")
 
 
 def create_extraction_provenance(

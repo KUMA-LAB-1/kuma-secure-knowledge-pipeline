@@ -44,7 +44,7 @@ def _reject_duplicate_keys(
 
     for key, value in pairs:
         if key in result:
-            raise AnalysisInputIntegrityError(f"Duplicate JSON key: {key}.")
+            raise AnalysisInputIntegrityError("Duplicate JSON object key.")
         result[key] = value
 
     return result
@@ -66,19 +66,31 @@ def _read_json_text_bounded(path: Path) -> str:
     if limit is None:
         raise AnalysisInputIntegrityError("Unsupported evidence JSON filename.")
 
+    read_failed = False
+
     try:
         with path.open("rb") as stream:
             content = stream.read(limit + 1)
-    except OSError as exc:
-        raise AnalysisInputIntegrityError("Cannot read evidence JSON.") from exc
+    except OSError:
+        read_failed = True
+
+    if read_failed:
+        raise AnalysisInputIntegrityError("Cannot read evidence JSON.")
 
     if len(content) > limit:
         raise AnalysisInputIntegrityError(f"Evidence JSON exceeds byte limit: {path.name}.")
 
+    invalid_encoding = False
+
     try:
-        return content.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise AnalysisInputIntegrityError(f"Invalid evidence UTF-8: {path.name}.") from exc
+        decoded = content.decode("utf-8")
+    except UnicodeDecodeError:
+        invalid_encoding = True
+
+    if invalid_encoding:
+        raise AnalysisInputIntegrityError(f"Invalid evidence UTF-8: {path.name}.")
+
+    return decoded
 
 
 def _validate_json_depth(text: str) -> None:
@@ -122,10 +134,12 @@ def _parse_finite_json_float(token: str) -> float:
 
 
 def _json_object(path: Path) -> dict[str, Any]:
-    try:
-        content = _read_json_text_bounded(path)
-        _validate_json_depth(content)
+    content = _read_json_text_bounded(path)
+    _validate_json_depth(content)
 
+    invalid_json = False
+
+    try:
         value = json.loads(
             content,
             object_pairs_hook=_reject_duplicate_keys,
@@ -141,8 +155,11 @@ def _json_object(path: Path) -> dict[str, Any]:
         ValueError,
         RecursionError,
         OverflowError,
-    ) as exc:
-        raise AnalysisInputIntegrityError(f"Invalid evidence JSON: {path.name}.") from exc
+    ):
+        invalid_json = True
+
+    if invalid_json:
+        raise AnalysisInputIntegrityError(f"Invalid evidence JSON: {path.name}.")
 
     if not isinstance(value, dict):
         raise AnalysisInputIntegrityError(f"Evidence JSON is not an object: {path.name}.")
@@ -206,18 +223,33 @@ def _validate_raw_lineage(
         if not isinstance(tsv_text, str) or not isinstance(recorded_sha256, str):
             raise AnalysisInputIntegrityError("Invalid raw tsv evidence.")
 
-        actual_sha256 = hashlib.sha256(tsv_text.encode("utf-8")).hexdigest()
+        invalid_tsv_encoding = False
+
+        try:
+            encoded_tsv = tsv_text.encode("utf-8")
+        except UnicodeEncodeError:
+            invalid_tsv_encoding = True
+
+        if invalid_tsv_encoding:
+            raise AnalysisInputIntegrityError("Invalid raw tsv encoding.")
+
+        actual_sha256 = hashlib.sha256(encoded_tsv).hexdigest()
 
         if actual_sha256 != recorded_sha256:
             raise AnalysisInputIntegrityError("Raw tsv SHA-256 mismatch.")
+
+        invalid_tsv = False
 
         try:
             replayed = normalize_tesseract_tsv(
                 artifact_id=artifact_id,
                 tsv_text=tsv_text,
             )
-        except TesseractResponseError as exc:
-            raise AnalysisInputIntegrityError("Invalid raw tsv evidence.") from exc
+        except TesseractResponseError:
+            invalid_tsv = True
+
+        if invalid_tsv:
+            raise AnalysisInputIntegrityError("Invalid raw tsv evidence.")
 
     else:
         raise AnalysisInputIntegrityError("Unsupported evidence provider and operation.")
@@ -234,19 +266,31 @@ _EXTRACTED_TEXT_BYTE_LIMIT = 16 * 1024 * 1024
 
 def _read_extracted_text_bounded(path: Path) -> str:
     """Read extracted text with a strict byte budget."""
+    read_failed = False
+
     try:
         with path.open("rb") as stream:
             content = stream.read(_EXTRACTED_TEXT_BYTE_LIMIT + 1)
-    except OSError as exc:
-        raise AnalysisInputIntegrityError("Cannot read extracted text.") from exc
+    except OSError:
+        read_failed = True
+
+    if read_failed:
+        raise AnalysisInputIntegrityError("Cannot read extracted text.")
 
     if len(content) > _EXTRACTED_TEXT_BYTE_LIMIT:
         raise AnalysisInputIntegrityError("Extracted text exceeds byte limit.")
 
+    invalid_encoding = False
+
     try:
-        return content.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
-    except UnicodeDecodeError as exc:
-        raise AnalysisInputIntegrityError("Invalid extracted text UTF-8.") from exc
+        decoded = content.decode("utf-8")
+    except UnicodeDecodeError:
+        invalid_encoding = True
+
+    if invalid_encoding:
+        raise AnalysisInputIntegrityError("Invalid extracted text UTF-8.")
+
+    return decoded.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _reject_redirected_ancestors(bundle_dir: Path) -> None:
@@ -296,10 +340,15 @@ def load_analysis_input(bundle_dir: Path) -> AnalysisInput:
     source = _object(manifest.get("source"), "source")
     run = _object(manifest.get("run"), "run")
 
+    invalid_provenance = False
+
     try:
         validate_extraction_provenance(ExtractionProvenance(**run))
-    except (TypeError, ValueError) as exc:
-        raise AnalysisInputIntegrityError("Invalid extraction provenance.") from exc
+    except (TypeError, ValueError):
+        invalid_provenance = True
+
+    if invalid_provenance:
+        raise AnalysisInputIntegrityError("Invalid extraction provenance.")
     extraction = _object(manifest.get("extraction"), "extraction")
 
     artifact_id = _text(source.get("artifact_id"), "source artifact_id")

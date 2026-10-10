@@ -32,10 +32,15 @@ class TesseractResponseError(ValueError):
 
 def _positive_integer(value: str, *, field: str) -> int:
     """Parse a positive TSV identifier without accepting invalid values."""
+    invalid_integer = False
+
     try:
         number = int(value)
-    except ValueError as exc:
-        raise TesseractResponseError(f"Tesseract TSV has invalid {field}.") from exc
+    except ValueError:
+        invalid_integer = True
+
+    if invalid_integer:
+        raise TesseractResponseError(f"Tesseract TSV has invalid {field}.")
 
     if number < 1:
         raise TesseractResponseError(f"Tesseract TSV has invalid {field}.")
@@ -45,10 +50,15 @@ def _positive_integer(value: str, *, field: str) -> int:
 
 def _word_confidence(value: str) -> float:
     """Validate confidence on a recognized WORD row."""
+    invalid_confidence = False
+
     try:
         confidence = float(value)
-    except ValueError as exc:
-        raise TesseractResponseError("Tesseract WORD confidence must be numeric.") from exc
+    except ValueError:
+        invalid_confidence = True
+
+    if invalid_confidence:
+        raise TesseractResponseError("Tesseract WORD confidence must be numeric.")
 
     if not math.isfinite(confidence) or not 0.0 <= confidence <= 100.0:
         raise TesseractResponseError("Tesseract WORD confidence must be between 0 and 100.")
@@ -95,12 +105,15 @@ def normalize_tesseract_tsv(
         if len(fields) != len(TSV_COLUMNS):
             raise TesseractResponseError(f"Tesseract TSV row {row_number} has invalid columns.")
 
+        invalid_level = False
+
         try:
             level = int(fields[0])
-        except ValueError as exc:
-            raise TesseractResponseError(
-                f"Tesseract TSV row {row_number} has invalid level."
-            ) from exc
+        except ValueError:
+            invalid_level = True
+
+        if invalid_level:
+            raise TesseractResponseError(f"Tesseract TSV row {row_number} has invalid level.")
 
         if level not in (1, 2, 3, 4, 5):
             raise TesseractResponseError(f"Tesseract TSV row {row_number} has invalid level.")

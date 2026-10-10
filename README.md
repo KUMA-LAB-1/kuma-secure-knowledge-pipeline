@@ -8,7 +8,7 @@
 
 O KUMA Secure Knowledge Pipeline é um projeto independente de engenharia de software e segurança. O **Challenge 01** estabeleceu a extração OCR, a integridade e a rastreabilidade documental; o **Challenge 02** acrescentou contratos GenAI e orquestração funcional **offline**, em revisão no [PR #3](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3); o **Challenge 03** está planejado para recuperação de conhecimento e citações.
 
-> **Estado técnico em 10/10/2026:** Challenge 01 integrado e versionado em [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Challenge 02: implementação local demonstrada, 244 testes globais locais aprovados e [Security CI GREEN](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38041583472) no commit `57fdd91`; PR #3 ainda **Draft e sem merge**. Não houve execução real de AWS Step Functions, Bedrock, Lambda ou S3 nesse incremento.
+> **Estado técnico em 10/10/2026:** Challenge 01 integrado e versionado em [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Challenge 02: implementação offline exercitada com **278 testes globais locais aprovados e 2 smokes**, conforme checkpoint local pré-publicação de 10/10/2026. O commit-base [`f57b951`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/f57b95112176149504f5cc145bc36dc09becefe9) possui [Security CI aprovado](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38069047649), mas esse CI **não valida as correções locais posteriores**. O PR #3 permanece **Draft e sem merge**. Não houve execução real de AWS Step Functions, Bedrock, Lambda ou S3 nesse incremento.
 
 > **Transparência:** o fluxo OCR local com **Tesseract** foi executado e auditado. O adapter **Amazon Textract** foi desenvolvido e testado com respostas sintéticas, porém a primeira tentativa real de `DetectDocumentText` foi bloqueada com `SubscriptionRequiredException`. **Não existe resultado OCR AWS bem-sucedido neste Challenge 01.** Os motores não são apresentados como equivalentes, nem suas evidências são misturadas.
 
@@ -245,20 +245,21 @@ A demonstração com provider falso validou a sequência de etapas, reabertura d
 
 ## 10. Verificação e alcance dos testes
 
-Resultados observados para a branch Challenge 02 no checkpoint de **10/10/2026**, commit [`57fdd91`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/57fdd91916e9ec3b89ee6ad9feecf02bcd4a38e2):
+Esta seção registra checkpoints datados. Em **10/10/2026**, as correções foram verificadas localmente antes da publicação. Os resultados remotos pertencem exclusivamente aos commits indicados e não devem ser confundidos com esse gate local.
 
-| Verificação | Resultado e abrangência |
+| Marco ou verificação | Resultado e abrangência |
 |---|---|
-| `pytest` global local | **244 testes aprovados** |
-| Testes estruturais da ASL | **7 aprovados**, sem validação AWS do serviço |
-| Quality gate local | Ruff, formatação, Bandit, auditoria de dependências auditáveis, detect-secrets e diff GREEN |
-| GitHub Security CI | [Execução **SUCCESS**](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38041583472), incluindo o job `Smokey functional gate` |
-| Assinatura do commit de segurança | SSH **Verified** pelo GitHub |
+| Checkpoint histórico [`57fdd91`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/57fdd91916e9ec3b89ee6ad9feecf02bcd4a38e2) | **244 testes globais locais aprovados** e [Security CI SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38041583472) naquele marco |
+| Commit-base [`f57b951`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/f57b95112176149504f5cc145bc36dc09becefe9) | [Security CI SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38069047649), anterior às correções locais em revisão |
+| Checkpoint local pré-publicação em **10/10/2026** | **278 testes globais aprovados** e **2 smokes aprovados** |
+| Quality gate local em 10/10/2026 | Ruff lint e format, Bandit, auditoria de dependências auditáveis e `git diff --check` aprovados; `detect-secrets` sem achados em **87 arquivos** |
+| Contratos ASL | **7 testes estruturais aprovados** no checkpoint histórico, sem validação pelo serviço AWS |
+| Assinatura do marco histórico de segurança | SSH **Verified** pelo GitHub |
 
 **Os níveis de demonstração não devem ser confundidos:**
 
 1. **Smoke OCR:** o teste `tests/smoke/test_local_pipeline_smokey.py` cobre um pipeline OCR local com cliente Textract *sintético*, a publicação dos artefatos e canários de não vazamento de dados do ambiente/caminho local. Esse smoke passou no CI.
-2. **GenAI e handlers locais:** testes funcionais, de contratos e adversariais próprios; demonstração offline com provider falso e persistência local; inferência Qwen real foi exercitada separadamente. **Ainda não há smoke dedicado de ponta a ponta marcado para essa camada.**
+2. **GenAI e handlers locais:** o smoke `tests/smoke/test_genai_stage_smokey.py` cobre offline o percurso OCR sintético, `LoadEvidence`, `BuildRequest`, `Enrich` e `PersistResult`, incluindo reabertura do resultado persistido, idempotência e verificação de canários. Usa cliente OCR e provider GenAI sintéticos, **sem executar AWS ou Ollama nesse teste**. A inferência Qwen real foi exercitada separadamente.
 3. **Smoke cloud:** **não implementado e não executado** para Step Functions, Lambda, Bedrock ou S3. Os testes locais não podem ser usados como prova de uso desses serviços.
 
 O `pip-audit` não identificou vulnerabilidades conhecidas nas dependências auditáveis, mas não conseguiu auditar o pacote local do próprio projeto por ele não estar publicado no PyPI. Nenhum teste garante por si só isolamento perfeito contra entradas hostis ou ausência de incorreções semânticas do modelo.
