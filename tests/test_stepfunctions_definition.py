@@ -47,10 +47,11 @@ def test_every_operational_error_routes_to_fail_closed_audit(definition):
     states = definition["States"]
     for name in TASKS[:-1]:
         assert states[name]["Catch"] == [
-            {"ErrorEquals": ["States.ALL"], "ResultPath": "$.failure", "Next": "AuditFailure"}
+            {"ErrorEquals": ["States.ALL"], "ResultPath": None, "Next": "AuditFailure"}
         ]
     assert states["AuditFailure"]["Next"] == "Failed"
     assert states["AuditFailure"]["Catch"][0]["Next"] == "Failed"
+    assert states["AuditFailure"]["Catch"][0]["ResultPath"] is None
     assert states["AuditFailure"]["ResultPath"] is None
 
 
@@ -62,6 +63,20 @@ def test_inference_and_persistence_are_not_automatically_retried(definition):
     assert len(retry) == 1
     assert retry[0]["MaxAttempts"] <= 2
     assert "States.ALL" not in retry[0]["ErrorEquals"]
+
+
+def test_caught_error_payload_is_not_forwarded(definition):
+    states = definition["States"]
+
+    for name in TASKS:
+        assert states[name]["Catch"][0]["ResultPath"] is None
+
+    assert states["AuditFailure"]["Parameters"]["Payload"] == {
+        "execution_id.$": "$$.Execution.Id",
+        "error_code": "KumaStageFailed",
+    }
+
+    assert "$.failure" not in json.dumps(states)
 
 
 def test_execution_state_contains_references_not_model_text(definition):
@@ -79,7 +94,7 @@ def test_execution_state_contains_references_not_model_text(definition):
         assert "Payload.$" not in task["Parameters"]
     assert set(states["AuditFailure"]["Parameters"]["Payload"]) == {
         "execution_id.$",
-        "error_code.$",
+        "error_code",
     }
 
 

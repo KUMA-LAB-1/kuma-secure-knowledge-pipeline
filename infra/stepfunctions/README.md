@@ -56,6 +56,21 @@ I/O actions. Lambda timeout values must also be configured consistently.
 The historical OCR provider name is provenance metadata, **not independent
 proof of live AWS invocation**. Synthetic fixtures must remain clearly labeled.
 
+## Failure data minimization
+
+All task catchers discard the caught error from the forwarded state
+using `ResultPath: null`. The audit handler receives only the execution
+identifier and the fixed `KumaStageFailed` code, rather than a raw
+Lambda error or its `Cause`. This intentionally sacrifices detailed
+error classification at the workflow boundary.
+
+**Security limitation:** discarding a caught error from the forwarded
+state does not erase the originating error from AWS execution history.
+Production Lambda adapters must sanitize exception messages before
+returning them to Step Functions. Execution history, IAM permissions,
+logging, encryption and retention require separate security review.
+This offline definition does not establish AWS runtime safety.
+
 ## Validation and deployment boundary
 
 Local tests (`tests/test_stepfunctions_definition.py`) check the project-specific

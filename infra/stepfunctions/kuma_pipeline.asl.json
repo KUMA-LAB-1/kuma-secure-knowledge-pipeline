@@ -36,7 +36,7 @@
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.failure",
+          "ResultPath": null,
           "Next": "AuditFailure"
         }
       ],
@@ -60,7 +60,7 @@
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.failure",
+          "ResultPath": null,
           "Next": "AuditFailure"
         }
       ],
@@ -85,7 +85,7 @@
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.failure",
+          "ResultPath": null,
           "Next": "AuditFailure"
         }
       ],
@@ -112,7 +112,7 @@
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.failure",
+          "ResultPath": null,
           "Next": "AuditFailure"
         }
       ],
@@ -125,7 +125,7 @@
         "FunctionName": "${AuditFailureLambdaArn}",
         "Payload": {
           "execution_id.$": "$$.Execution.Id",
-          "error_code.$": "$.failure.Error"
+          "error_code": "KumaStageFailed"
         }
       },
       "ResultPath": null,
@@ -133,6 +133,7 @@
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
+          "ResultPath": null,
           "Next": "Failed"
         }
       ],

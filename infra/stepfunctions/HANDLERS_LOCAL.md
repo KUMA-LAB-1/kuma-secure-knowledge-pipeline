@@ -61,7 +61,7 @@ result = handlers.persist_result(
 ```
 
 This is a local replay of the five task payloads, **not a Step Functions execution**.
-For task errors, `audit_failure({"execution_id": execution_id, "error_code": "States.TaskFailed"})`
+For task errors, `audit_failure({"execution_id": execution_id, "error_code": "KumaStageFailed"})`
 records only the sanitized error code and execution identity, not the exception
 cause, OCR text, model response, or prompt.
 
