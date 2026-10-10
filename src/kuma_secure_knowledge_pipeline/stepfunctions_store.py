@@ -64,17 +64,35 @@ def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def _check_ancestry(path: Path) -> None:
     for part in (path, *path.parents):
+        inspection_failed = False
+
         try:
-            if part.is_symlink() or (hasattr(part, "is_junction") and part.is_junction()):
-                raise StageStoreError("Redirected storage path is forbidden.")
-        except OSError as exc:
-            raise StageStoreError("Cannot inspect storage path.") from exc
+            redirected = part.is_symlink() or (hasattr(part, "is_junction") and part.is_junction())
+        except OSError:
+            inspection_failed = True
+
+        if inspection_failed:
+            raise StageStoreError("Cannot inspect storage path.")
+
+        if redirected:
+            raise StageStoreError("Redirected storage path is forbidden.")
 
 
 def _private_dir(path: Path) -> None:
     _check_ancestry(path)
-    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    creation_failed = False
+
+    try:
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    except OSError:
+        creation_failed = True
+
+    if creation_failed:
+        raise StageStoreError("Cannot create private storage directory.")
+
     _check_ancestry(path)
+
     if not path.is_dir():
         raise StageStoreError("Invalid storage directory.")
 
@@ -83,33 +101,101 @@ def _atomic_create_once(destination: Path, content: bytes) -> None:
     """Write complete bytes before publishing with a no-overwrite hardlink."""
     if len(content) > _MAX_RECORD_BYTES:
         raise StageStoreError("Stage record exceeds byte limit.")
+
     _private_dir(destination.parent)
-    fd, temporary = tempfile.mkstemp(prefix=".kuma-stage-", dir=destination.parent)
+
+    creation_failed = False
+
     try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
+        fd, temporary = tempfile.mkstemp(prefix=".kuma-stage-", dir=destination.parent)
+    except OSError:
+        creation_failed = True
+
+    if creation_failed:
+        raise StageStoreError("Cannot create temporary stage record.")
+
+    write_failed = False
+    publish_failed = False
+    existing_destination = False
+    cleanup_failed = False
+
+    try:
         try:
-            os.link(temporary, destination)
-        except FileExistsError:
-            if _read_bytes(destination) != content:
-                raise StageStoreError("Conflicting existing stage record.") from None
-        except OSError as exc:
-            raise StageStoreError("Cannot publish stage record atomically.") from exc
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError:
+            write_failed = True
+
+        if not write_failed:
+            try:
+                os.link(temporary, destination)
+            except FileExistsError:
+                existing_destination = True
+            except OSError:
+                publish_failed = True
     finally:
-        Path(temporary).unlink(missing_ok=True)
+        try:
+            Path(temporary).unlink(missing_ok=True)
+        except OSError:
+            cleanup_failed = True
+
+    if write_failed:
+        if cleanup_failed:
+            raise StageStoreError("Cannot write temporary stage record; temporary cleanup failed.")
+        raise StageStoreError("Cannot write temporary stage record.")
+
+    if publish_failed:
+        if cleanup_failed:
+            raise StageStoreError(
+                "Cannot publish stage record atomically; temporary cleanup failed."
+            )
+        raise StageStoreError("Cannot publish stage record atomically.")
+
+    if existing_destination:
+        read_failure_message = None
+
+        try:
+            existing_content = _read_bytes(destination)
+        except StageStoreError as exc:
+            read_failure_message = str(exc)
+
+        if read_failure_message is not None:
+            if cleanup_failed:
+                if read_failure_message == "Cannot read stage record.":
+                    raise StageStoreError("Cannot read stage record; temporary cleanup failed.")
+                raise StageStoreError(
+                    "Cannot verify existing stage record; temporary cleanup failed."
+                )
+            raise StageStoreError(read_failure_message)
+
+        if existing_content != content:
+            if cleanup_failed:
+                raise StageStoreError(
+                    "Conflicting existing stage record; temporary cleanup failed."
+                )
+            raise StageStoreError("Conflicting existing stage record.")
+
+    if cleanup_failed:
+        raise StageStoreError("Temporary cleanup failed; verify publication state.")
 
 
 def _read_bytes(path: Path) -> bytes:
     _check_ancestry(path)
     if not path.is_file():
         raise StageStoreError("Missing stage record.")
+    read_failed = False
+
     try:
         with path.open("rb") as stream:
             content = stream.read(_MAX_RECORD_BYTES + 1)
-    except OSError as exc:
-        raise StageStoreError("Cannot read stage record.") from exc
+    except OSError:
+        read_failed = True
+
+    if read_failed:
+        raise StageStoreError("Cannot read stage record.")
+
     if len(content) > _MAX_RECORD_BYTES:
         raise StageStoreError("Stage record exceeds byte limit.")
     return content
@@ -122,24 +208,55 @@ class LocalStageStore:
         if not root.is_absolute() or not evidence_root.is_absolute():
             raise StageStoreError("Storage roots must be absolute.")
         _check_ancestry(evidence_root)
+
         if not evidence_root.is_dir():
             raise StageStoreError("Evidence root missing.")
+
+        _check_ancestry(root)
+
+        root_resolution_failed = False
+
+        try:
+            planned_root = root.resolve(strict=False)
+            approved_evidence = evidence_root.resolve(strict=True)
+        except (OSError, ValueError, RuntimeError):
+            root_resolution_failed = True
+
+        if root_resolution_failed:
+            raise StageStoreError("Cannot resolve storage roots.")
+
+        if planned_root.is_relative_to(approved_evidence) or approved_evidence.is_relative_to(
+            planned_root
+        ):
+            raise StageStoreError("Storage roots must not overlap.")
+
         _private_dir(root)
-        self.root = root.resolve(strict=True)
-        self.evidence_root = evidence_root.resolve(strict=True)
-        if self.root == self.evidence_root:
-            raise StageStoreError("Store root must be separate from evidence root.")
+        final_resolution_failed = False
+        try:
+            resolved_root = root.resolve(strict=True)
+        except (OSError, ValueError, RuntimeError):
+            final_resolution_failed = True
+        if final_resolution_failed:
+            raise StageStoreError("Cannot resolve storage roots.")
+        self.root = resolved_root
+        self.evidence_root = approved_evidence
 
     def check_bundle_path(self, path: Path) -> Path:
         """Validate that a pre-registered path stays inside the evidence root."""
         if not path.is_absolute():
             raise StageStoreError("Bundle path must be absolute.")
         _check_ancestry(path)
+        invalid_path = False
+
         try:
             resolved = path.resolve(strict=True)
             resolved.relative_to(self.evidence_root)
-        except (OSError, ValueError) as exc:
-            raise StageStoreError("Bundle outside approved evidence root.") from exc
+        except (OSError, ValueError):
+            invalid_path = True
+
+        if invalid_path:
+            raise StageStoreError("Bundle outside approved evidence root.")
+
         if not resolved.is_dir():
             raise StageStoreError("Bundle directory missing.")
         return resolved
