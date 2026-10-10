@@ -277,14 +277,13 @@ O projeto adota **R$ 0,00 de desembolso pessoal** como restrição de engenharia
 
 **Equivalência de conceito não significa equivalência de serviço.** A escolha de ferramentas abertas demonstra decisões arquiteturais sob restrições de custo, mas não comprova automaticamente atendimento aos requisitos literais de um exercício que solicite serviços AWS e um assistente de delivery.
 
-## 12. Marcos e evolução do projeto
+## 12. Marcos do projeto
 
 | Marco | Situação verificável |
 |---|---|
 | **Challenge 01: OCR e evidências** | **Concluído e integrado**, [PR #2](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/2) e tag assinada [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Tesseract local real; Textract real bloqueado. |
 | **Challenge 02: orquestração e GenAI** | **Implementação offline concluída para revisão**, [PR #3 Draft](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3); ainda sem merge, Bedrock ou Step Functions AWS reais. |
 | **Challenge 03: wiki/knowledge pipeline** | Planejado: ingestão multi-formato, recuperação, RAG, provenance e citações. |
-| **Expansão futura** | Integração com fluxos SOC, SIEM, EDR e XDR mediante requisitos e validações adicionais. |
 
 O **GitHub Release completo** ficará para depois da conclusão dos três desafios. Os documentos e experimentos privados não integram automaticamente o escopo público do repositório.
 
