@@ -8,7 +8,7 @@
 
 O KUMA Secure Knowledge Pipeline é um projeto independente de engenharia de software e segurança. O **Challenge 01** estabeleceu a extração OCR, a integridade e a rastreabilidade documental; o **Challenge 02** acrescentou contratos GenAI e orquestração funcional **offline**, em revisão no [PR #3](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3); o **Challenge 03** está planejado para recuperação de conhecimento e citações.
 
-> **Estado técnico em 10/10/2026:** Challenge 01 integrado e versionado em [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Challenge 02: implementação offline exercitada com **278 testes globais locais aprovados e 2 smokes**, conforme checkpoint local pré-publicação de 10/10/2026. O commit-base [`f57b951`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/f57b95112176149504f5cc145bc36dc09becefe9) possui [Security CI aprovado](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38069047649), mas esse CI **não valida as correções locais posteriores**. O PR #3 permanece **Draft e sem merge**. Não houve execução real de AWS Step Functions, Bedrock, Lambda ou S3 nesse incremento.
+> **Estado técnico em 10/10/2026 (C02-POST-064):** Challenge 01 integrado e versionado em [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Challenge 02 implementado **offline**, com **296 testes aprovados no Security CI** (incluindo **2 smokes**, não adicionais), no commit SSH [`535cb257`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/535cb257f46e114607ec27357467ee7f60931092). [CI push SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086828686) e [CI pull_request SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086831265). O [PR #3](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3) está **Ready for review**, ainda sem merge. Não houve execução real de AWS Step Functions, Bedrock, Lambda ou S3 nesta etapa.
 
 > **Transparência:** o fluxo OCR local com **Tesseract** foi executado e auditado. O adapter **Amazon Textract** foi desenvolvido e testado com respostas sintéticas, porém a primeira tentativa real de `DetectDocumentText` foi bloqueada com `SubscriptionRequiredException`. **Não existe resultado OCR AWS bem-sucedido neste Challenge 01.** Os motores não são apresentados como equivalentes, nem suas evidências são misturadas.
 
@@ -245,14 +245,16 @@ A demonstração com provider falso validou a sequência de etapas, reabertura d
 
 ## 10. Verificação e alcance dos testes
 
-Esta seção registra checkpoints datados. Em **10/10/2026**, as correções foram verificadas localmente antes da publicação. Os resultados remotos pertencem exclusivamente aos commits indicados e não devem ser confundidos com esse gate local.
+Esta seção preserva checkpoints históricos e destaca a validação mais recente, vinculada ao SHA exato de cada execução. Os resultados intermediários continuam registrados, mas não substituem o gate final do commit `535cb257`.
 
 | Marco ou verificação | Resultado e abrangência |
 |---|---|
 | Checkpoint histórico [`57fdd91`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/57fdd91916e9ec3b89ee6ad9feecf02bcd4a38e2) | **244 testes globais locais aprovados** e [Security CI SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38041583472) naquele marco |
-| Commit-base [`f57b951`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/f57b95112176149504f5cc145bc36dc09becefe9) | [Security CI SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38069047649), anterior às correções locais em revisão |
+| Commit-base [`f57b951`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/f57b95112176149504f5cc145bc36dc09becefe9) | [Security CI SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38069047649), anterior às correções posteriores já publicadas no commit `535cb257` |
 | Checkpoint local pré-publicação em **10/10/2026** | **278 testes globais aprovados** e **2 smokes aprovados** |
 | Quality gate local em 10/10/2026 | Ruff lint e format, Bandit, auditoria de dependências auditáveis e `git diff --check` aprovados; `detect-secrets` sem achados em **87 arquivos** |
+| **C02-POST-064, commit de validação [`535cb257`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/commit/535cb257f46e114607ec27357467ee7f60931092)** | **296 testes aprovados** no CI remoto; 2 smokes incluídos nos 296; 7 commits desse checkpoint assinados e verificados pelo GitHub |
+| **CI remoto do commit `535cb257`** | [CI push SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086828686) e [CI pull_request SUCCESS](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/actions/runs/38086831265); pytest, Ruff, Bandit, auditoria das dependências auditáveis, detecção de segredos, diff e smoke aprovados |
 | Contratos ASL | **7 testes estruturais aprovados** no checkpoint histórico, sem validação pelo serviço AWS |
 | Assinatura do marco histórico de segurança | SSH **Verified** pelo GitHub |
 
@@ -283,7 +285,7 @@ O projeto adota **R$ 0,00 de desembolso pessoal** como restrição de engenharia
 | Marco | Situação verificável |
 |---|---|
 | **Challenge 01: OCR e evidências** | **Concluído e integrado**, [PR #2](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/2) e tag assinada [`v0.1.0-ocr-evidence`](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/tree/v0.1.0-ocr-evidence). Tesseract local real; Textract real bloqueado. |
-| **Challenge 02: orquestração e GenAI** | **Implementação offline concluída para revisão**, [PR #3 Draft](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3); ainda sem merge, Bedrock ou Step Functions AWS reais. |
+| **Challenge 02: orquestração e GenAI** | **Implementação offline concluída para revisão**, [PR #3 Ready for review](https://github.com/KUMA-LAB-1/kuma-secure-knowledge-pipeline/pull/3); ainda sem merge, Bedrock ou Step Functions AWS reais. |
 | **Challenge 03: wiki/knowledge pipeline** | Planejado: ingestão multi-formato, recuperação, RAG, provenance e citações. |
 
 O **GitHub Release completo** ficará para depois da conclusão dos três desafios. Os documentos e experimentos privados não integram automaticamente o escopo público do repositório.
