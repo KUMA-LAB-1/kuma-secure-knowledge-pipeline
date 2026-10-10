@@ -92,10 +92,15 @@ def _check_json_depth(text: str) -> None:
 def _validate_unicode_scalars(value: Any) -> None:
     """Reject unpaired Unicode surrogates in all JSON strings."""
     if type(value) is str:
+        invalid_scalar = False
+
         try:
             value.encode()
-        except UnicodeEncodeError as exc:
-            raise GenAIResponseIntegrityError("Invalid Unicode scalar in provider JSON.") from exc
+        except UnicodeEncodeError:
+            invalid_scalar = True
+
+        if invalid_scalar:
+            raise GenAIResponseIntegrityError("Invalid Unicode scalar in provider JSON.")
 
     elif type(value) is dict:
         for key, item in value.items():
@@ -118,12 +123,19 @@ def decode_genai_json(raw: bytes) -> dict[str, Any]:
     if raw.startswith(b"\xef\xbb\xbf"):
         raise GenAIResponseIntegrityError("UTF-8 BOM is not allowed.")
 
+    invalid_utf8 = False
+
     try:
         text = raw.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise GenAIResponseIntegrityError("Invalid UTF-8 JSON.") from exc
+    except UnicodeDecodeError:
+        invalid_utf8 = True
+
+    if invalid_utf8:
+        raise GenAIResponseIntegrityError("Invalid UTF-8 JSON.")
 
     _check_json_depth(text)
+
+    invalid_json = False
 
     try:
         value = json.loads(
@@ -140,8 +152,11 @@ def decode_genai_json(raw: bytes) -> dict[str, Any]:
         ValueError,
         OverflowError,
         RecursionError,
-    ) as exc:
-        raise GenAIResponseIntegrityError("Invalid provider JSON.") from exc
+    ):
+        invalid_json = True
+
+    if invalid_json:
+        raise GenAIResponseIntegrityError("Invalid provider JSON.")
 
     if type(value) is not dict:
         raise GenAIResponseIntegrityError("JSON root must be an object.")

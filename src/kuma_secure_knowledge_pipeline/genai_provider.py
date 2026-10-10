@@ -25,10 +25,17 @@ class GenAIProviderExecutionError(RuntimeError):
 
 def _validated_provider_request(request: object) -> GenAIRequest:
     """Enforce request invariants before any provider dispatch."""
+    invalid_request = False
+
     try:
-        return validate_genai_request(request)
-    except GenAIRequestIntegrityError as exc:
-        raise GenAIProviderIntegrityError("Invalid GenAI request.") from exc
+        validated_request = validate_genai_request(request)
+    except GenAIRequestIntegrityError:
+        invalid_request = True
+
+    if invalid_request:
+        raise GenAIProviderIntegrityError("Invalid GenAI request.")
+
+    return validated_request
 
 
 def _restore_mutated_request(
@@ -88,12 +95,19 @@ def enrich_with_provider(
     if not callable(generate):
         raise GenAIProviderIntegrityError("Provider must implement a callable generate method.")
 
+    provider_failed = False
+    request_mutated_on_failure = False
+
     try:
         raw = generate(request)
-    except Exception as exc:
-        if _restore_mutated_request(request, trusted_request):
-            raise GenAIProviderIntegrityError("Provider mutated request contract.") from exc
-        raise GenAIProviderExecutionError("Provider generation failed.") from exc
+    except Exception:
+        provider_failed = True
+        request_mutated_on_failure = _restore_mutated_request(request, trusted_request)
+
+    if provider_failed:
+        if request_mutated_on_failure:
+            raise GenAIProviderIntegrityError("Provider mutated request contract.")
+        raise GenAIProviderExecutionError("Provider generation failed.")
 
     if _restore_mutated_request(request, trusted_request):
         raise GenAIProviderIntegrityError("Provider mutated request contract.")

@@ -78,10 +78,15 @@ def build_genai_request(context: AnalysisInput) -> GenAIRequest:
     if len(text) > MAX_GENAI_EVIDENCE_UTF8_BYTES:
         raise GenAIRequestIntegrityError("OCR evidence exceeds byte budget.")
 
+    invalid_text_encoding = False
+
     try:
         encoded_size = len(text.encode("utf-8"))
-    except UnicodeEncodeError as exc:
-        raise GenAIRequestIntegrityError("Invalid OCR text encoding.") from exc
+    except UnicodeEncodeError:
+        invalid_text_encoding = True
+
+    if invalid_text_encoding:
+        raise GenAIRequestIntegrityError("Invalid OCR text encoding.")
 
     if encoded_size > MAX_GENAI_EVIDENCE_UTF8_BYTES:
         raise GenAIRequestIntegrityError("OCR evidence exceeds byte budget.")
@@ -103,10 +108,15 @@ def build_genai_request(context: AnalysisInput) -> GenAIRequest:
         ):
             raise GenAIRequestIntegrityError("Invalid evidence reference.")
 
+        invalid_reference_encoding = False
+
         try:
             reference_size = len(reference.encode("utf-8"))
-        except UnicodeEncodeError as exc:
-            raise GenAIRequestIntegrityError("Invalid evidence reference encoding.") from exc
+        except UnicodeEncodeError:
+            invalid_reference_encoding = True
+
+        if invalid_reference_encoding:
+            raise GenAIRequestIntegrityError("Invalid evidence reference encoding.")
 
         reference_bytes_total += reference_size
 

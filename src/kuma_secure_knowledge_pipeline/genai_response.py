@@ -42,10 +42,15 @@ def _bounded_text(
     if type(value) is not str or not value.strip() or len(value) > byte_limit:
         raise GenAIResponseIntegrityError(f"Invalid {field}.")
 
+    invalid_text_encoding = False
+
     try:
         size = len(value.encode("utf-8"))
-    except UnicodeEncodeError as exc:
-        raise GenAIResponseIntegrityError(f"Invalid {field} encoding.") from exc
+    except UnicodeEncodeError:
+        invalid_text_encoding = True
+
+    if invalid_text_encoding:
+        raise GenAIResponseIntegrityError(f"Invalid {field} encoding.")
 
     if size > byte_limit:
         raise GenAIResponseIntegrityError(f"Invalid {field} byte length.")

@@ -135,6 +135,7 @@ class OllamaLocalProvider:
             raise OllamaLocalError("Local inference request exceeds byte limit.")
 
         connection = None
+        transport_failed = False
 
         try:
             connection = http.client.HTTPConnection(
@@ -161,12 +162,20 @@ class OllamaLocalProvider:
             if len(raw) > _MAX_TRANSPORT_BYTES:
                 raise OllamaLocalError("Local inference response exceeds byte limit.")
 
-        except (OSError, TimeoutError, http.client.HTTPException) as exc:
-            raise OllamaLocalError("Local inference failed.") from exc
+        except (OSError, TimeoutError, http.client.HTTPException):
+            transport_failed = True
 
         finally:
             if connection is not None:
-                connection.close()
+                try:
+                    connection.close()
+                except (OSError, http.client.HTTPException):
+                    transport_failed = True
+
+        if transport_failed:
+            raise OllamaLocalError("Local inference failed.")
+
+        invalid_response = False
 
         try:
             document = json.loads(raw)
@@ -203,5 +212,8 @@ class OllamaLocalProvider:
 
             return output
 
-        except (ValueError, UnicodeError, TypeError) as exc:
-            raise OllamaLocalError("Invalid local inference response.") from exc
+        except (ValueError, UnicodeError, TypeError, RecursionError):
+            invalid_response = True
+
+        if invalid_response:
+            raise OllamaLocalError("Invalid local inference response.")
