@@ -3,13 +3,13 @@
 from dataclasses import FrozenInstanceError, replace
 
 import pytest
+
+from kuma_secure_knowledge_pipeline.artifacts import build_source_artifact
+from kuma_secure_knowledge_pipeline.knowledge_contracts import SourceLocator
 from kuma_secure_knowledge_pipeline.knowledge_csv import (
     CsvEvidenceResolutionError,
     resolve_csv_record,
 )
-
-from kuma_secure_knowledge_pipeline.artifacts import build_source_artifact
-from kuma_secure_knowledge_pipeline.knowledge_contracts import SourceLocator
 from kuma_secure_knowledge_pipeline.knowledge_evidence import (
     load_verified_source_snapshot,
 )
