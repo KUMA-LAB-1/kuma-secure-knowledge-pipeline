@@ -110,34 +110,9 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-
-          head_sha="$(git rev-parse HEAD)"
-
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            base_sha="${PR_BASE_SHA:?Missing pull request base SHA}"
-          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            base_sha="${PUSH_BEFORE_SHA:?Missing push before SHA}"
-
-            if [[ "$base_sha" == "0000000000000000000000000000000000000000" ]]; then
-              base_sha="$(git merge-base origin/main "$head_sha")"
-            fi
-          else
-            echo "Unsupported GitHub event."
-            exit 1
-          fi
-
-          git cat-file -e "${base_sha}^{commit}"
-          git cat-file -e "${head_sha}^{commit}"
-
-          if [[ "$base_sha" == "$head_sha" ]]; then
-            echo "Empty commit comparison range."
-            exit 1
-          fi
-
-          echo "Checking committed diff against selected base."
-          git diff --check "$base_sha" "$head_sha"
+          PUSH_CREATED: ${{ github.event.created }}
+          PUSH_AFTER_SHA: ${{ github.event.after }}
+        run: uv run python scripts/check_repository_diff_hygiene.py
 
       - name: Smokey functional gate
         run: uv run pytest -m smoke -q
