@@ -1,14 +1,20 @@
 """Bounded lexical retrieval from independently reverified CSV chunks."""
 
+import json
 import unicodedata
 from dataclasses import dataclass
 
+from kuma_secure_knowledge_pipeline.knowledge_budget import (
+    project_chunk_allocation,
+    within_amplification_budget,
+)
 from kuma_secure_knowledge_pipeline.knowledge_chunks import (
     ChunkPolicy,
     KnowledgeChunk,
     chunk_csv_record,
 )
 from kuma_secure_knowledge_pipeline.knowledge_contracts import SourceLocator
+from kuma_secure_knowledge_pipeline.knowledge_csv import resolve_csv_record
 from kuma_secure_knowledge_pipeline.knowledge_evidence import (
     VerifiedSourceSnapshot,
 )
@@ -164,6 +170,32 @@ def _verify_corpus(
             locator=checked_locator,
             content=snapshot.content,
         )
+
+        # Bound the verified canonical projection before chunk allocation.
+        record = resolve_csv_record(checked_snapshot)
+        canonical_chars = len(
+            json.dumps(
+                [[name, value] for name, value in record.fields],
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            )
+        )
+
+        required_chunks, projected_chars = project_chunk_allocation(
+            canonical_chars=canonical_chars,
+            max_chars=checked_policy.max_chars,
+            overlap_chars=checked_policy.overlap_chars,
+        )
+
+        if required_chunks > policy.max_candidates:
+            raise RetrievalError("Projected retrieval corpus exceeds candidate budget.")
+
+        if not within_amplification_budget(
+            canonical_chars=canonical_chars,
+            projected_chars=projected_chars,
+        ):
+            raise RetrievalError("Retrieval corpus amplification exceeds limit.")
 
         expected = chunk_csv_record(
             checked_snapshot,
